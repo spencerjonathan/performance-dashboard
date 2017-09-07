@@ -52,6 +52,15 @@ public class App
 		}
 		
     	Gson gson = new Gson();
-        return gson.fromJson(config_reader, Config.class);
+        Config config = gson.fromJson(config_reader, Config.class);
+        
+        try {
+			config_reader.close();
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+        
+        return config;
     }
 }

@@ -1,6 +1,7 @@
 package devops.performance_dashboard;
 
 import java.io.File;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.text.MessageFormat;
@@ -77,6 +78,8 @@ public class GitAdaptor {
 		System.out.println("Finding un-merged commits");
 		commits = git.log().all().not(master).call();
 
+		List<GitEdit> gedits = new ArrayList<GitEdit>();
+		
 		RevWalk rw = new RevWalk(repository);
 		for (RevCommit rev : commits) {
 			System.out.println("Commit: " + rev + ", name: " + rev.getName() + ", id: " + rev.getId().getName());
@@ -125,14 +128,33 @@ public class GitAdaptor {
 					Gson gson = new Gson();
 					String json = gson.toJson(gedit);
 					System.out.println(json);
+					
+					gedits.add(gedit);
 				}
 			}
 			/*
 			 * FileHeader fileHeader = formatter.toFileHeader(entries.get(0));
 			 * return fileHeader.toEditList();
 			 */
+			
+			
 
 		}
+		
+		File output_file = new File("./git.js");
+		if (!output_file.canWrite()) {
+			System.err.println("Cannot write git.json output file)");
+			//System.exit(-1);
+		}
+		
+		FileWriter writer = new FileWriter(output_file);
+		Gson gson = new Gson();
+		
+		writer.write("var gitWIPData = ");
+		gson.toJson(gedits, writer);
+		writer.write(";");
+		
+		writer.close();
 
 	}
 
