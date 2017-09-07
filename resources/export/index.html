@@ -17,11 +17,40 @@
       function drawChart() {
     	
     	  var columns = [ "Date" ];
-    	  var tmp_data = {};
-    	  var data = [ "Today" ];
     	  
+    	  var data = [ ];
+    	  var tmp_data3 = [];
     	  
-    	  gitWIPData.forEach(function (edit) {
+    	  // Get distinct list of branches accross all dates
+    	  var branches = {};
+    	  for (var date in gitWIPData) {
+    		  gitWIPData[date].forEach(function(edit) {
+    			 branches[edit.branch] = 1; 
+    		  });
+    	  }
+    	  
+    	  for (var date in gitWIPData) {
+    		  columns.push(date);
+    		  
+    		  var tmp_data = {};
+    		  gitWIPData[date].forEach(function(edit) {
+    			  if (tmp_data[edit.branch] == null) tmp_data[edit.branch] = 0;
+        		  tmp_data[edit.branch] += edit.length;
+    		  });
+    		  
+    		  var tmp_data2 = [ date ];
+    		  for (var branch in branches) {
+    			  var val = tmp_data[branch] || 0;
+    			  tmp_data2.push(val);
+    		  }
+    		  
+    		  tmp_data3 = tmp_data3.concat([tmp_data2]);
+    	  }
+    	  
+    	  data = data.concat([columns]);
+    	  data = data.concat(tmp_data3);
+    	  
+    	  /* gitWIPData.forEach(function (edit) {
     		  //columns.push(edit.branch);
     		  if (tmp_data[edit.branch] == null) tmp_data[edit.branch] = 0;
     		  tmp_data[edit.branch] += edit.length;
@@ -30,12 +59,9 @@
     	  for(var branch in tmp_data) {
     		  columns.push(branch);
     		  data.push(tmp_data[branch]);
-    	  };
+    	  }; */
     	  
-    	  var data = google.visualization.arrayToDataTable([
-    	        columns,
-    	        data,
-    	      ]);
+    	  var data = google.visualization.arrayToDataTable(data);
 
     	      var options = {
     	        width: 600,

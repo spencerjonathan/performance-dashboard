@@ -1,12 +1,21 @@
 package devops.performance_dashboard;
 
+import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.io.Reader;
+import java.text.DateFormat;
 import java.text.MessageFormat;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.errors.CheckoutConflictException;
@@ -39,6 +48,7 @@ import org.eclipse.jgit.transport.UsernamePasswordCredentialsProvider;
 import org.eclipse.jgit.util.io.DisabledOutputStream;
 
 import com.google.gson.Gson;
+import com.google.gson.reflect.TypeToken;
 
 public class GitAdaptor {
 	
@@ -141,24 +151,80 @@ public class GitAdaptor {
 
 		}
 		
-		File output_file = new File("./git.js");
-		if (!output_file.canWrite()) {
-			System.err.println("Cannot write git.json output file)");
-			//System.exit(-1);
-		}
+		writeFiles(gedits);
 		
-		FileWriter writer = new FileWriter(output_file);
+	}
+
+	private void writeFiles(List<GitEdit> gedits) throws IOException {
+
 		Gson gson = new Gson();
+		Map<String, List<GitEdit>> history = loadHistory();
+		
+		DateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd");
+		Date date = new Date();
+		String current_date = dateFormat.format(date);
+		
+		history.put(current_date, gedits);
+		
+		
+		// Write git.js file
+		File output_file = new File("./git.js");
+		FileWriter writer = new FileWriter(output_file);
+		
 		
 		writer.write("var gitWIPData = ");
-		gson.toJson(gedits, writer);
+		gson.toJson(history, writer);
 		writer.write(";");
 		
 		writer.close();
+		
+		File working_folder = new File("./working");
+		
+		if (!working_folder.exists()) {
+			working_folder.mkdirs();
+		}
+		// Write History File
+		output_file = new File("./working/git_history.json");
+		writer = new FileWriter(output_file);
+		
+		gson.toJson(history, writer);
 
+		writer.close();
 	}
-
-	public List<String> getBranchesContainingCommit(Git git, String id) throws RevisionSyntaxException,
+	
+	private static Map<String, List<GitEdit>> loadHistory() {
+    	File history_file = new File("./working/git_history.json");
+    	
+    	if (!history_file.exists()) {
+    		System.out.println("Config file does not exist");
+    		return new HashMap<String, List<GitEdit>>();
+    	}
+    	
+    	Reader history_reader = null;
+		try {
+			history_reader = new BufferedReader(new FileReader(history_file));
+		} catch (FileNotFoundException e) {
+			
+			e.printStackTrace();
+			System.out.println("Error reading History file");
+    		System.exit(-1);
+		}
+		
+    	Gson gson = new Gson();
+    	java.lang.reflect.Type type = new TypeToken<Map<String, List<GitEdit>>>(){}.getType();
+        Map<String, List<GitEdit>> history = gson.fromJson(history_reader, type);
+        
+        try {
+			history_reader.close();
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+        
+        return history;
+    }
+	
+	private List<String> getBranchesContainingCommit(Git git, String id) throws RevisionSyntaxException,
 			AmbiguousObjectException, IncorrectObjectTypeException, IOException, RefAlreadyExistsException,
 			RefNotFoundException, InvalidRefNameException, CheckoutConflictException, GitAPIException {
 		List<String> branches = new ArrayList<String>();
@@ -186,6 +252,10 @@ public class GitAdaptor {
 		walk.dispose();
 		
 		return branches;
+	}
+	
+	private void loadHistoryFile() {
+		
 	}
 
 }
