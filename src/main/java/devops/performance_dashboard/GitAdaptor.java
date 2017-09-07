@@ -52,14 +52,14 @@ public class GitAdaptor {
 
 	public void cloneRepository() throws CorruptObjectException, MissingObjectException, IOException,
 			InvalidRemoteException, TransportException, GitAPIException {
-		File repositoryFile = new File("/tmp/repo");
+		File repositoryFile = new File(config.getLocalRepository());
 		Git git = null;
 
 		if (!repositoryFile.exists()) {
 
 			CredentialsProvider cp = new UsernamePasswordCredentialsProvider(config.getUsername(), config.getPassword());
 			System.out.println("Cloning repository");
-			git = Git.cloneRepository().setURI("https://github.com/spencerjonathan/member-database")
+			git = Git.cloneRepository().setURI(config.getUri())
 					.setDirectory(repositoryFile).setCredentialsProvider(cp).call();
 
 		} else {
