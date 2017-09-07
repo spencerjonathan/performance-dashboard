@@ -28,9 +28,12 @@
     			 branches[edit.branch] = 1; 
     		  });
     	  }
+
+	  for (var branch in branches) {
+		columns.push(branch);
+	  }
     	  
     	  for (var date in gitWIPData) {
-    		  columns.push(date);
     		  
     		  var tmp_data = {};
     		  gitWIPData[date].forEach(function(edit) {
