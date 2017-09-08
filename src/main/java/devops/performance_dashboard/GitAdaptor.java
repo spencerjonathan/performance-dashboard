@@ -18,6 +18,7 @@ import java.util.List;
 import java.util.Map;
 
 import org.eclipse.jgit.api.Git;
+import org.eclipse.jgit.api.ListBranchCommand.ListMode;
 import org.eclipse.jgit.api.errors.CheckoutConflictException;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.InvalidRefNameException;
@@ -51,36 +52,52 @@ import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 
 public class GitAdaptor {
-	
+
 	private Config config;
 
 	public GitAdaptor(Config config) {
 		System.out.println("Constructing GitAdaptor");
 		this.config = config;
-		
+
 	}
 
-	public void cloneRepository() throws CorruptObjectException, MissingObjectException, IOException,
-			InvalidRemoteException, TransportException, GitAPIException {
+	private Git getUpdatedRepository() throws InvalidRemoteException, TransportException, GitAPIException, IOException {
 		File repositoryFile = new File(config.getLocalRepository());
 		Git git = null;
 
 		if (!repositoryFile.exists()) {
 
-			CredentialsProvider cp = new UsernamePasswordCredentialsProvider(config.getUsername(), config.getPassword());
+			CredentialsProvider cp = new UsernamePasswordCredentialsProvider(config.getUsername(),
+					config.getPassword());
 			System.out.println("Cloning repository");
-			git = Git.cloneRepository().setURI(config.getUri())
-					.setDirectory(repositoryFile).setCredentialsProvider(cp).call();
-
-		} else {
-
-			git = Git.open(repositoryFile);
+			git = Git.cloneRepository().setURI(config.getUri()).setDirectory(repositoryFile).setCredentialsProvider(cp)
+					.call();
 
 		}
 
-		Repository repository = null;
+		git = Git.open(repositoryFile);
+		
+		List<Ref> call = git.branchList().setListMode( ListMode.ALL ).call();
+		for (Ref ref : call) {
+		    System.out.println("Branch: " + ref + " " + ref.getName() + " "
+		            + ref.getObjectId().getName());
+		 
+		}
+		
+		System.out.println("Executing Git Pull to update local repository");
+		git.fetch().call();
 
-		repository = new FileRepository(repositoryFile + "/.git");
+		return git;
+	}
+
+	public void getUnMergedChanges() throws CorruptObjectException, MissingObjectException, IOException,
+			InvalidRemoteException, TransportException, GitAPIException {
+
+		Git git = getUpdatedRepository();
+
+		Repository repository = git.getRepository();
+
+		// repository = new FileRepository(repositoryFile + "/.git");
 
 		Iterable<RevCommit> commits = null;
 
@@ -89,7 +106,7 @@ public class GitAdaptor {
 		commits = git.log().all().not(master).call();
 
 		List<GitEdit> gedits = new ArrayList<GitEdit>();
-		
+
 		RevWalk rw = new RevWalk(repository);
 		for (RevCommit rev : commits) {
 			System.out.println("Commit: " + rev + ", name: " + rev.getName() + ", id: " + rev.getId().getName());
@@ -104,6 +121,8 @@ public class GitAdaptor {
 			List<DiffEntry> entries = null;
 
 			entries = formatter.scan(parent.getTree(), rev.getTree());
+			
+			rev.getAuthorIdent().getName();
 
 			for (DiffEntry diff : entries) {
 				System.out.println(MessageFormat.format("({0} {1} {2}", diff.getChangeType().name(),
@@ -111,7 +130,7 @@ public class GitAdaptor {
 
 				FileHeader header = formatter.toFileHeader(diff);
 
-				List<String> branches = getBranchesContainingCommit(git, rev.getId().getName());
+				//List<String> branches = getBranchesContainingCommit(git, rev.getId().getName());
 
 				EditList editlist = header.toEditList();
 
@@ -121,24 +140,25 @@ public class GitAdaptor {
 					System.out.println("B: " + edit.getBeginB() + " - " + edit.getEndB());
 					System.out.println("A length: " + edit.getLengthA());
 					System.out.println("B length: " + edit.getLengthB());
-					System.out.println("Branch: " + branches.get(0));
 
 					int length = edit.getLengthB();
 					if (edit.getType().equals(Type.DELETE)) {
 						length = edit.getLengthA();
 					}
 
-					String branch="Unknown";
+					/*String branch = "Unknown";
 					if (branches.size() > 0) {
-						branch=branches.get(0);
-					}
-					
-					GitEdit gedit = new GitEdit(branch, rev.getName(), edit.getType().toString(), edit.getBeginA(), length);
-					
+						System.out.println("Branch: " + branches.get(0));
+						branch = branches.get(0);
+					}*/
+
+					GitEdit gedit = new GitEdit(rev.getAuthorIdent().getName(), rev.getName(), edit.getType().toString(), edit.getBeginA(),
+							length);
+
 					Gson gson = new Gson();
 					String json = gson.toJson(gedit);
 					System.out.println(json);
-					
+
 					gedits.add(gedit);
 				}
 			}
@@ -146,84 +166,81 @@ public class GitAdaptor {
 			 * FileHeader fileHeader = formatter.toFileHeader(entries.get(0));
 			 * return fileHeader.toEditList();
 			 */
-			
-			
 
 		}
-		
+
 		writeFiles(gedits);
-		
+
 	}
 
 	private void writeFiles(List<GitEdit> gedits) throws IOException {
 
 		Gson gson = new Gson();
 		Map<String, List<GitEdit>> history = loadHistory();
-		
+
 		DateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd");
 		Date date = new Date();
 		String current_date = dateFormat.format(date);
-		
+
 		history.put(current_date, gedits);
-		
-		
+
 		// Write git.js file
 		File output_file = new File("./git.js");
 		FileWriter writer = new FileWriter(output_file);
-		
-		
+
 		writer.write("var gitWIPData = ");
 		gson.toJson(history, writer);
 		writer.write(";");
-		
+
 		writer.close();
-		
+
 		File working_folder = new File("./working");
-		
+
 		if (!working_folder.exists()) {
 			working_folder.mkdirs();
 		}
 		// Write History File
 		output_file = new File("./working/git_history.json");
 		writer = new FileWriter(output_file);
-		
+
 		gson.toJson(history, writer);
 
 		writer.close();
 	}
-	
+
 	private static Map<String, List<GitEdit>> loadHistory() {
-    	File history_file = new File("./working/git_history.json");
-    	
-    	if (!history_file.exists()) {
-    		System.out.println("Config file does not exist");
-    		return new HashMap<String, List<GitEdit>>();
-    	}
-    	
-    	Reader history_reader = null;
+		File history_file = new File("./working/git_history.json");
+
+		if (!history_file.exists()) {
+			System.out.println("Config file does not exist");
+			return new HashMap<String, List<GitEdit>>();
+		}
+
+		Reader history_reader = null;
 		try {
 			history_reader = new BufferedReader(new FileReader(history_file));
 		} catch (FileNotFoundException e) {
-			
+
 			e.printStackTrace();
 			System.out.println("Error reading History file");
-    		System.exit(-1);
+			System.exit(-1);
 		}
-		
-    	Gson gson = new Gson();
-    	java.lang.reflect.Type type = new TypeToken<Map<String, List<GitEdit>>>(){}.getType();
-        Map<String, List<GitEdit>> history = gson.fromJson(history_reader, type);
-        
-        try {
+
+		Gson gson = new Gson();
+		java.lang.reflect.Type type = new TypeToken<Map<String, List<GitEdit>>>() {
+		}.getType();
+		Map<String, List<GitEdit>> history = gson.fromJson(history_reader, type);
+
+		try {
 			history_reader.close();
 		} catch (IOException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
-        
-        return history;
-    }
-	
+
+		return history;
+	}
+
 	private List<String> getBranchesContainingCommit(Git git, String id) throws RevisionSyntaxException,
 			AmbiguousObjectException, IncorrectObjectTypeException, IOException, RefAlreadyExistsException,
 			RefNotFoundException, InvalidRefNameException, CheckoutConflictException, GitAPIException {
@@ -241,21 +258,21 @@ public class GitAdaptor {
 			git.checkout().setName(branch.getName()).call();
 
 			RevCommit head = walk.parseCommit(git.getRepository().resolve(Constants.HEAD));
-			
+
 			if (walk.isMergedInto(commit, head)) {
 				branches.add(branch.getName());
 
-			}	
+			}
 		}
 
 		walk.release();
 		walk.dispose();
-		
+
 		return branches;
 	}
-	
+
 	private void loadHistoryFile() {
-		
+
 	}
 
 }

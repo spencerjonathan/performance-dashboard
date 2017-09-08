@@ -29,7 +29,7 @@ public class App
         GitAdaptor adaptor = new GitAdaptor(config);
         
         try {
-			adaptor.cloneRepository();
+			adaptor.getUnMergedChanges();
 		} catch (IOException | GitAPIException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
