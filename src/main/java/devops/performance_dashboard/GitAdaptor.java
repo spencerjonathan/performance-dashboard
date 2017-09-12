@@ -14,11 +14,13 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.ListBranchCommand.ListMode;
+import org.eclipse.jgit.api.PullResult;
 import org.eclipse.jgit.api.errors.CheckoutConflictException;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.InvalidRefNameException;
@@ -76,16 +78,23 @@ public class GitAdaptor {
 		}
 
 		git = Git.open(repositoryFile);
-		
-		List<Ref> call = git.branchList().setListMode( ListMode.ALL ).call();
-		for (Ref ref : call) {
-		    System.out.println("Branch: " + ref + " " + ref.getName() + " "
-		            + ref.getObjectId().getName());
-		 
-		}
-		
+
+		/*
+		 * List<Ref> call = git.branchList().setListMode(ListMode.ALL).call();
+		 * for (Ref ref : call) { System.out.println("Branch: " + ref + " " +
+		 * ref.getName() + " " + ref.getObjectId().getName());
+		 * 
+		 * }
+		 */
+
 		System.out.println("Executing Git Pull to update local repository");
-		git.fetch().call();
+		PullResult pr = git.pull().call();
+		
+		if (pr.isSuccessful()) {
+			System.out.println("Git Pull Successful..");
+		} else {
+			System.out.println("Git Pull Unsuccessful..");
+		}
 
 		return git;
 	}
@@ -99,74 +108,86 @@ public class GitAdaptor {
 
 		// repository = new FileRepository(repositoryFile + "/.git");
 
-		Iterable<RevCommit> commits = null;
+		// Iterable<RevCommit> commits = null;
 
 		ObjectId master = repository.resolve("refs/heads/master");
 		System.out.println("Finding un-merged commits");
-		commits = git.log().all().not(master).call();
+		// commits = git.log().all().not(master).call();
+
+		//Iterable<RevCommit> commits = git.log().all().not(master).call();
 
 		List<GitEdit> gedits = new ArrayList<GitEdit>();
 
-		RevWalk rw = new RevWalk(repository);
-		for (RevCommit rev : commits) {
-			System.out.println("Commit: " + rev + ", name: " + rev.getName() + ", id: " + rev.getId().getName());
-			RevCommit parent = null;
+		RevWalk walk = new RevWalk(repository);
 
-			parent = rw.parseCommit(rev.getParent(0).getId());
+		List<Ref> branches = git.branchList().setListMode(ListMode.ALL).call();
 
-			OutputStream outputStream = DisabledOutputStream.INSTANCE;
+		for (Ref branch : branches) {
+			//String branchName = branch.getName();
 
-			DiffFormatter formatter = new DiffFormatter(outputStream);
-			formatter.setRepository(git.getRepository());
-			List<DiffEntry> entries = null;
-
-			entries = formatter.scan(parent.getTree(), rev.getTree());
+			System.out.println("Commits of branch: " + branch.getName());
+			System.out.println("-------------------------------------");
 			
-			rev.getAuthorIdent().getName();
+			Iterable<RevCommit> commits = git.log().all().not(master).call();
+			
+			for (RevCommit commit : commits) {
+				//boolean foundInThisBranch = false;
 
-			for (DiffEntry diff : entries) {
-				System.out.println(MessageFormat.format("({0} {1} {2}", diff.getChangeType().name(),
-						diff.getNewMode().getBits(), diff.getNewPath()));
+				RevCommit tip = walk.parseCommit(branch.getLeaf().getObjectId());
+				if (walk.isMergedInto(commit, tip) || commit.equals(tip)) {
 
-				FileHeader header = formatter.toFileHeader(diff);
+					//foundInThisBranch = true;
 
-				//List<String> branches = getBranchesContainingCommit(git, rev.getId().getName());
+					RevCommit parent = null;
+					parent = walk.parseCommit(commit.getParent(0).getId());
 
-				EditList editlist = header.toEditList();
+					OutputStream outputStream = DisabledOutputStream.INSTANCE;
 
-				for (Edit edit : editlist) {
-					System.out.println("Type: " + edit.getType().toString());
-					System.out.println("A: " + edit.getBeginA() + " - " + edit.getEndA());
-					System.out.println("B: " + edit.getBeginB() + " - " + edit.getEndB());
-					System.out.println("A length: " + edit.getLengthA());
-					System.out.println("B length: " + edit.getLengthB());
+					DiffFormatter formatter = new DiffFormatter(outputStream);
+					formatter.setRepository(git.getRepository());
+					List<DiffEntry> entries = null;
 
-					int length = edit.getLengthB();
-					if (edit.getType().equals(Type.DELETE)) {
-						length = edit.getLengthA();
+					entries = formatter.scan(parent.getTree(), commit.getTree());
+
+					for (DiffEntry diff : entries) {
+						System.out.println(MessageFormat.format("({0} {1} {2}", diff.getChangeType().name(),
+								diff.getNewMode().getBits(), diff.getNewPath()));
+
+						FileHeader header = formatter.toFileHeader(diff);
+
+						// List<String> branches =
+						// getBranchesContainingCommit(git,
+						// rev.getId().getName());
+
+						EditList editlist = header.toEditList();
+
+						for (Edit edit : editlist) {
+							System.out.println("Type: " + edit.getType().toString());
+							System.out.println("A: " + edit.getBeginA() + " - " + edit.getEndA());
+							System.out.println("B: " + edit.getBeginB() + " - " + edit.getEndB());
+							System.out.println("A length: " + edit.getLengthA());
+							System.out.println("B length: " + edit.getLengthB());
+
+							int length = edit.getLengthB();
+							if (edit.getType().equals(Type.DELETE)) {
+								length = edit.getLengthA();
+							}
+
+							GitEdit gedit = new GitEdit(commit.getAuthorIdent().getName(), branch.getName(),
+									commit.getName(), edit.getType().toString(), edit.getBeginA(), length);
+
+							Gson gson = new Gson();
+							String json = gson.toJson(gedit);
+							System.out.println(json);
+
+							gedits.add(gedit);
+						}
+
+						
 					}
-
-					/*String branch = "Unknown";
-					if (branches.size() > 0) {
-						System.out.println("Branch: " + branches.get(0));
-						branch = branches.get(0);
-					}*/
-
-					GitEdit gedit = new GitEdit(rev.getAuthorIdent().getName(), rev.getName(), edit.getType().toString(), edit.getBeginA(),
-							length);
-
-					Gson gson = new Gson();
-					String json = gson.toJson(gedit);
-					System.out.println(json);
-
-					gedits.add(gedit);
+					break;
 				}
 			}
-			/*
-			 * FileHeader fileHeader = formatter.toFileHeader(entries.get(0));
-			 * return fileHeader.toEditList();
-			 */
-
 		}
 
 		writeFiles(gedits);
