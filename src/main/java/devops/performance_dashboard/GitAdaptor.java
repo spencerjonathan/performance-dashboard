@@ -79,22 +79,14 @@ public class GitAdaptor {
 
 		git = Git.open(repositoryFile);
 
-		/*
-		 * List<Ref> call = git.branchList().setListMode(ListMode.ALL).call();
-		 * for (Ref ref : call) { System.out.println("Branch: " + ref + " " +
-		 * ref.getName() + " " + ref.getObjectId().getName());
-		 * 
-		 * }
-		 */
-
 		System.out.println("Executing Git Pull to update local repository");
-		PullResult pr = git.pull().call();
-		
+		/*PullResult pr = git.pull().call();
+
 		if (pr.isSuccessful()) {
 			System.out.println("Git Pull Successful..");
 		} else {
 			System.out.println("Git Pull Unsuccessful..");
-		}
+		}*/
 
 		return git;
 	}
@@ -106,15 +98,8 @@ public class GitAdaptor {
 
 		Repository repository = git.getRepository();
 
-		// repository = new FileRepository(repositoryFile + "/.git");
-
-		// Iterable<RevCommit> commits = null;
-
 		ObjectId master = repository.resolve("refs/heads/master");
 		System.out.println("Finding un-merged commits");
-		// commits = git.log().all().not(master).call();
-
-		//Iterable<RevCommit> commits = git.log().all().not(master).call();
 
 		List<GitEdit> gedits = new ArrayList<GitEdit>();
 
@@ -122,70 +107,73 @@ public class GitAdaptor {
 
 		List<Ref> branches = git.branchList().setListMode(ListMode.ALL).call();
 
-		for (Ref branch : branches) {
-			//String branchName = branch.getName();
+		Iterable<RevCommit> commits = git.log().all().not(master).call();
 
-			System.out.println("Commits of branch: " + branch.getName());
-			System.out.println("-------------------------------------");
-			
-			Iterable<RevCommit> commits = git.log().all().not(master).call();
-			
-			for (RevCommit commit : commits) {
-				//boolean foundInThisBranch = false;
+		for (RevCommit commit : commits) {
 
-				RevCommit tip = walk.parseCommit(branch.getLeaf().getObjectId());
-				if (walk.isMergedInto(commit, tip) || commit.equals(tip)) {
+			if (commit.getParents().length < 2) {  // Don't include merge commits
 
-					//foundInThisBranch = true;
+				RevCommit parent = null;
 
-					RevCommit parent = null;
-					parent = walk.parseCommit(commit.getParent(0).getId());
+				parent = walk.parseCommit(commit.getParent(0).getId());
 
-					OutputStream outputStream = DisabledOutputStream.INSTANCE;
+				for (Ref branch : branches) {
 
-					DiffFormatter formatter = new DiffFormatter(outputStream);
-					formatter.setRepository(git.getRepository());
-					List<DiffEntry> entries = null;
+					// System.out.println("Commits of branch: " +
+					// branch.getName());
+					// System.out.println("-------------------------------------");
 
-					entries = formatter.scan(parent.getTree(), commit.getTree());
+					RevCommit tip = walk.parseCommit(branch.getLeaf().getObjectId());
+					if (walk.isMergedInto(commit, tip) || commit.equals(tip)) {
 
-					for (DiffEntry diff : entries) {
-						System.out.println(MessageFormat.format("({0} {1} {2}", diff.getChangeType().name(),
-								diff.getNewMode().getBits(), diff.getNewPath()));
+						// foundInThisBranch = true;
 
-						FileHeader header = formatter.toFileHeader(diff);
+						OutputStream outputStream = DisabledOutputStream.INSTANCE;
 
-						// List<String> branches =
-						// getBranchesContainingCommit(git,
-						// rev.getId().getName());
+						DiffFormatter formatter = new DiffFormatter(outputStream);
+						formatter.setRepository(git.getRepository());
+						List<DiffEntry> entries = null;
 
-						EditList editlist = header.toEditList();
+						entries = formatter.scan(parent.getTree(), commit.getTree());
 
-						for (Edit edit : editlist) {
-							System.out.println("Type: " + edit.getType().toString());
-							System.out.println("A: " + edit.getBeginA() + " - " + edit.getEndA());
-							System.out.println("B: " + edit.getBeginB() + " - " + edit.getEndB());
-							System.out.println("A length: " + edit.getLengthA());
-							System.out.println("B length: " + edit.getLengthB());
+						for (DiffEntry diff : entries) {
+							System.out.println(MessageFormat.format("({0} {1} {2}", diff.getChangeType().name(),
+									diff.getNewMode().getBits(), diff.getNewPath()));
 
-							int length = edit.getLengthB();
-							if (edit.getType().equals(Type.DELETE)) {
-								length = edit.getLengthA();
+							FileHeader header = formatter.toFileHeader(diff);
+
+							EditList editlist = header.toEditList();
+
+							for (Edit edit : editlist) {
+								System.out.println("Type: " + edit.getType().toString());
+								System.out.println("A: " + edit.getBeginA() + " - " + edit.getEndA());
+								System.out.println("B: " + edit.getBeginB() + " - " + edit.getEndB());
+								System.out.println("A length: " + edit.getLengthA());
+								System.out.println("B length: " + edit.getLengthB());
+
+								int length = edit.getLengthB();
+								String path = diff.getNewPath();
+								if (edit.getType().equals(Type.DELETE)) {
+									length = edit.getLengthA();
+									path = diff.getOldPath();
+								}
+
+								GitEdit gedit = new GitEdit(commit.getAuthorIdent().getName(), branch.getName(),
+										commit.getName(), path, edit.getType().toString(), edit.getBeginA(), length);
+
+								Gson gson = new Gson();
+								String json = gson.toJson(gedit);
+								// System.out.println(json);
+
+								gedits.add(gedit);
+								
 							}
 
-							GitEdit gedit = new GitEdit(commit.getAuthorIdent().getName(), branch.getName(),
-									commit.getName(), edit.getType().toString(), edit.getBeginA(), length);
-
-							Gson gson = new Gson();
-							String json = gson.toJson(gedit);
-							System.out.println(json);
-
-							gedits.add(gedit);
 						}
+						break;
 
-						
 					}
-					break;
+
 				}
 			}
 		}

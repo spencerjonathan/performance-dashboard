@@ -5,15 +5,17 @@ public class GitEdit {
 	private String author;
 	private String branch;
 	private String revision;
+	private String path;
 	private String type;
 	private int begin;
 	private int length;
 
-	public GitEdit(String author, String branch, String revision, String type, int begin, int length) {
+	public GitEdit(String author, String branch, String revision, String path, String type, int begin, int length) {
 		// TODO Auto-generated constructor stub
 		this.setAuthor(author);
 		this.branch=branch;
 		this.revision=revision;
+		this.setPath(path);
 		this.type=type;
 		this.begin=begin;
 		this.length=length;
@@ -65,6 +67,14 @@ public class GitEdit {
 
 	public void setAuthor(String author) {
 		this.author = author;
+	}
+
+	public String getPath() {
+		return path;
+	}
+
+	public void setPath(String path) {
+		this.path = path;
 	}
 
 }
