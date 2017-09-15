@@ -5,6 +5,7 @@ public class Config {
 	private String password;
 	private String uri;
 	private String localRepository;
+	private boolean performPull;
 	
 	public Config(String username, String password, String uri, String localRepository) {
 		this.username = username;
@@ -43,6 +44,14 @@ public class Config {
 
 	public void setLocalRepository(String local_repository) {
 		this.localRepository = local_repository;
+	}
+
+	public boolean getPerformPull() {
+		return performPull;
+	}
+
+	public void setPerformPull(boolean performPull) {
+		this.performPull = performPull;
 	}
 	
 }

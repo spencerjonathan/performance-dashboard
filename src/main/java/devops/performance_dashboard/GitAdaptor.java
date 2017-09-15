@@ -25,6 +25,7 @@ import org.eclipse.jgit.api.errors.CheckoutConflictException;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.InvalidRefNameException;
 import org.eclipse.jgit.api.errors.InvalidRemoteException;
+import org.eclipse.jgit.api.errors.NoHeadException;
 import org.eclipse.jgit.api.errors.RefAlreadyExistsException;
 import org.eclipse.jgit.api.errors.RefNotFoundException;
 import org.eclipse.jgit.api.errors.TransportException;
@@ -79,16 +80,91 @@ public class GitAdaptor {
 
 		git = Git.open(repositoryFile);
 
-		System.out.println("Executing Git Pull to update local repository");
-		/*PullResult pr = git.pull().call();
-
-		if (pr.isSuccessful()) {
-			System.out.println("Git Pull Successful..");
+		if (config.getPerformPull()) {
+			System.out.print("Executing Git Pull to update local repository.. ");
+			git.pull().call();
+			System.out.println("(Complete)");
 		} else {
-			System.out.println("Git Pull Unsuccessful..");
-		}*/
+			System.out.print("Not performing Git Pull!");
+		}
 
 		return git;
+	}
+
+	private List<GitEdit> findEditsForCommitInBranch(Repository repository, RevWalk walk, RevCommit commit, Ref branch) throws MissingObjectException, IncorrectObjectTypeException, IOException {
+
+		// Setup the formatter
+		OutputStream outputStream = DisabledOutputStream.INSTANCE;
+		DiffFormatter formatter = new DiffFormatter(outputStream);
+		formatter.setRepository(repository);
+		
+		// Get the diffs in the commit
+		RevCommit parent = walk.parseCommit(commit.getParent(0).getId());
+		List<DiffEntry> entries = formatter.scan(parent.getTree(), commit.getTree());
+		
+		// Create a list of GitEdits to hold the results in
+		List<GitEdit> gedits = new ArrayList<GitEdit>();
+		
+		for (DiffEntry diff : entries) {
+
+			// Get the list of edits
+			FileHeader header = formatter.toFileHeader(diff);
+			EditList editlist = header.toEditList();
+
+			for (Edit edit : editlist) {
+
+				int length = edit.getLengthB();
+				String path = diff.getNewPath();
+				if (edit.getType().equals(Type.DELETE)) {
+					length = edit.getLengthA();
+					path = diff.getOldPath();
+				}
+
+				GitEdit gedit = new GitEdit(commit.getAuthorIdent().getName(), branch.getName(),
+						commit.getName(), path, edit.getType().toString(), edit.getBeginA(), length);
+
+				gedits.add(gedit);
+
+			}
+
+		}
+		
+		return gedits;
+	}
+	
+	private List<GitEdit> findEditsForCommit(Git git, RevCommit commit, List<Ref> branches) throws MissingObjectException, IncorrectObjectTypeException, IOException, NoHeadException, GitAPIException {
+		RevCommit parent = null;
+
+		RevWalk walk = new RevWalk(git.getRepository());
+
+		for (Ref branch : branches) {
+
+			// System.out.println("Commits of branch: " +
+			// branch.getName());
+			// System.out.println("-------------------------------------");
+
+			RevCommit tip = walk.parseCommit(branch.getLeaf().getObjectId());
+			if (isMergedInto(git, commit, tip)) {
+
+				return findEditsForCommitInBranch(git.getRepository(), walk, commit, branch);
+				
+			}
+
+		}
+		
+		return new ArrayList<GitEdit>();
+	}
+	
+	private boolean isMergedInto(Git git, RevCommit commit, RevCommit tip) throws NoHeadException, MissingObjectException, IncorrectObjectTypeException, GitAPIException {
+		Iterable<RevCommit> commits = git.log().add(tip).call();
+		
+		for (RevCommit i_commit : commits) {
+			if (i_commit.equals(commit)) {
+				return true;
+			}
+		}
+		
+		return false;
 	}
 
 	public void getUnMergedChanges() throws CorruptObjectException, MissingObjectException, IOException,
@@ -103,78 +179,15 @@ public class GitAdaptor {
 
 		List<GitEdit> gedits = new ArrayList<GitEdit>();
 
-		RevWalk walk = new RevWalk(repository);
-
 		List<Ref> branches = git.branchList().setListMode(ListMode.ALL).call();
 
 		Iterable<RevCommit> commits = git.log().all().not(master).call();
 
 		for (RevCommit commit : commits) {
 
-			if (commit.getParents().length < 2) {  // Don't include merge commits
-
-				RevCommit parent = null;
-
-				parent = walk.parseCommit(commit.getParent(0).getId());
-
-				for (Ref branch : branches) {
-
-					// System.out.println("Commits of branch: " +
-					// branch.getName());
-					// System.out.println("-------------------------------------");
-
-					RevCommit tip = walk.parseCommit(branch.getLeaf().getObjectId());
-					if (walk.isMergedInto(commit, tip) || commit.equals(tip)) {
-
-						// foundInThisBranch = true;
-
-						OutputStream outputStream = DisabledOutputStream.INSTANCE;
-
-						DiffFormatter formatter = new DiffFormatter(outputStream);
-						formatter.setRepository(git.getRepository());
-						List<DiffEntry> entries = null;
-
-						entries = formatter.scan(parent.getTree(), commit.getTree());
-
-						for (DiffEntry diff : entries) {
-							System.out.println(MessageFormat.format("({0} {1} {2}", diff.getChangeType().name(),
-									diff.getNewMode().getBits(), diff.getNewPath()));
-
-							FileHeader header = formatter.toFileHeader(diff);
-
-							EditList editlist = header.toEditList();
-
-							for (Edit edit : editlist) {
-								System.out.println("Type: " + edit.getType().toString());
-								System.out.println("A: " + edit.getBeginA() + " - " + edit.getEndA());
-								System.out.println("B: " + edit.getBeginB() + " - " + edit.getEndB());
-								System.out.println("A length: " + edit.getLengthA());
-								System.out.println("B length: " + edit.getLengthB());
-
-								int length = edit.getLengthB();
-								String path = diff.getNewPath();
-								if (edit.getType().equals(Type.DELETE)) {
-									length = edit.getLengthA();
-									path = diff.getOldPath();
-								}
-
-								GitEdit gedit = new GitEdit(commit.getAuthorIdent().getName(), branch.getName(),
-										commit.getName(), path, edit.getType().toString(), edit.getBeginA(), length);
-
-								Gson gson = new Gson();
-								String json = gson.toJson(gedit);
-								// System.out.println(json);
-
-								gedits.add(gedit);
-								
-							}
-
-						}
-						break;
-
-					}
-
-				}
+			if (commit.getParents().length < 2) { // Don't include merge commits
+				List<GitEdit> return_list = findEditsForCommit(git, commit, branches);
+				gedits.addAll(return_list);
 			}
 		}
 
@@ -250,7 +263,7 @@ public class GitAdaptor {
 		return history;
 	}
 
-	private List<String> getBranchesContainingCommit(Git git, String id) throws RevisionSyntaxException,
+	/*private List<String> getBranchesContainingCommit(Git git, String id) throws RevisionSyntaxException,
 			AmbiguousObjectException, IncorrectObjectTypeException, IOException, RefAlreadyExistsException,
 			RefNotFoundException, InvalidRefNameException, CheckoutConflictException, GitAPIException {
 		List<String> branches = new ArrayList<String>();
@@ -279,7 +292,7 @@ public class GitAdaptor {
 
 		return branches;
 	}
-
+*/
 	private void loadHistoryFile() {
 
 	}
