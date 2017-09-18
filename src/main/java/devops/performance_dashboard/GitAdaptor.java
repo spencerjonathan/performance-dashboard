@@ -97,8 +97,9 @@ public class GitAdaptor {
 
 		for (DiffEntry diff : entries) {
 
-			String path = diff.getNewPath();
-			if (!isExcludedPath(path)) {
+			String newPath = diff.getNewPath();
+			String oldPath = diff.getOldPath();
+			if (!isExcludedPath(newPath, oldPath)) {
 
 				// Get the list of edits
 				FileHeader header = formatter.toFileHeader(diff);
@@ -106,6 +107,7 @@ public class GitAdaptor {
 
 				for (Edit edit : editlist) {
 
+					String path = diff.getNewPath();
 					int length = edit.getLengthB();
 					if (edit.getType().equals(Type.DELETE)) {
 						length = edit.getLengthA();
@@ -230,14 +232,21 @@ public class GitAdaptor {
 
 	}
 
-	private boolean isExcludedPath(String path) {
+	private boolean isExcludedPath(String newPath, String oldPath) {
 
 		for (Iterator<String> configIterator = config.getPathExcludes().iterator(); configIterator.hasNext();) {
 
 			String excludeString = configIterator.next();
 
-			if (path.matches(excludeString)) {
-				System.out.println("Removing file " + path + " because it matches exclude string '"
+			if (newPath.matches(excludeString) ) {
+				System.out.println("Ignoring file " + newPath + " because it matches exclude string '"
+						+ excludeString + "'");
+				return true;
+				
+			}
+			
+			if (oldPath.matches(excludeString) ) {
+				System.out.println("Ignoring file " + newPath + " because it matches exclude string '"
 						+ excludeString + "'");
 				return true;
 				
