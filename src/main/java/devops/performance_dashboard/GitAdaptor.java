@@ -85,7 +85,7 @@ public class GitAdaptor {
 			git.pull().call();
 			System.out.println("(Complete)");
 		} else {
-			System.out.print("Not performing Git Pull!");
+			System.out.println("Not performing Git Pull!");
 		}
 
 		return git;
@@ -147,12 +147,15 @@ public class GitAdaptor {
 
 			RevCommit tip = walk.parseCommit(branch.getLeaf().getObjectId());
 			if (isMergedInto(git, commit, tip)) {
-
+				
+				System.out.println("Found in branch " + branch.getName());
 				return findEditsForCommitInBranch(git.getRepository(), walk, commit, branch);
 
 			}
 
 		}
+		
+		System.out.println("Not found in any branches");
 
 		return new ArrayList<GitEdit>();
 	}
@@ -166,8 +169,14 @@ public class GitAdaptor {
 
 		RevCommit mergeBase;
 		while ((mergeBase = walk.next()) != null)
-			if (mergeBase.equals(base))
+			if (mergeBase.equals(base)) {
+				walk.release();
+				walk.dispose();
 				return true;
+			}
+		
+		walk.release();
+		walk.dispose();
 		return false;
 
 	}
@@ -180,7 +189,7 @@ public class GitAdaptor {
 		Repository repository = git.getRepository();
 
 		ObjectId master = repository.resolve("refs/heads/master");
-		System.out.println("Finding un-merged commits");
+		System.out.print("Finding un-merged commits.. ");
 
 		List<GitEdit> gedits = new ArrayList<GitEdit>();
 
@@ -188,11 +197,16 @@ public class GitAdaptor {
 
 		Iterable<RevCommit> commits = git.log().all().not(master).call();
 
+		System.out.println("(Complete)");
 		for (RevCommit commit : commits) {
+			
+			System.out.print("Processing: " + commit.getName() + " - ");
 
 			if (commit.getParents().length < 2) { // Don't include merge commits
 				List<GitEdit> return_list = findEditsForCommit(git, commit, branches);
 				gedits.addAll(return_list);
+			} else {
+				System.out.println("Ignoring because is a merge commit");
 			}
 		}
 
@@ -268,36 +282,22 @@ public class GitAdaptor {
 		return history;
 	}
 
-	/*
-	 * private List<String> getBranchesContainingCommit(Git git, String id)
-	 * throws RevisionSyntaxException, AmbiguousObjectException,
-	 * IncorrectObjectTypeException, IOException, RefAlreadyExistsException,
-	 * RefNotFoundException, InvalidRefNameException, CheckoutConflictException,
-	 * GitAPIException { List<String> branches = new ArrayList<String>();
-	 * 
-	 * // Find commit
-	 * 
-	 * RevWalk walk = new RevWalk(git.getRepository()); ObjectId foundId =
-	 * git.getRepository().resolve(id + "^0"); RevCommit commit =
-	 * walk.parseCommit(foundId);
-	 * 
-	 * // For all Remote Branches for (Ref branch : git.branchList().call()) {
-	 * System.out.println("Checking out: " + branch.getName());
-	 * git.checkout().setName(branch.getName()).call();
-	 * 
-	 * RevCommit head =
-	 * walk.parseCommit(git.getRepository().resolve(Constants.HEAD));
-	 * 
-	 * if (walk.isMergedInto(commit, head)) { branches.add(branch.getName());
-	 * 
-	 * } }
-	 * 
-	 * walk.release(); walk.dispose();
-	 * 
-	 * return branches; }
-	 */
 	private void loadHistoryFile() {
 
 	}
 
+	public void getCommitHistory() throws IOException, NoHeadException, GitAPIException {
+		File repositoryFile = new File(config.getLocalRepository());
+		Git git = null;
+
+		git = Git.open(repositoryFile);
+		
+		Iterable<RevCommit> commits = git.log().all().call();
+		
+		for (RevCommit commit : commits) {
+			Commit c = new Commit(commit);
+			
+		}
+	}
+	
 }
