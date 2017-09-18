@@ -140,15 +140,14 @@ public class GitAdaptor {
 		RevWalk walk = new RevWalk(git.getRepository());
 
 		for (Ref branch : branches) {
-
-			// System.out.println("Commits of branch: " +
-			// branch.getName());
+			
+			System.out.println("\nScanning branch: " + branch.getName());
 			// System.out.println("-------------------------------------");
 
 			RevCommit tip = walk.parseCommit(branch.getLeaf().getObjectId());
 			if (isMergedInto(git, commit, tip)) {
 				
-				System.out.println("Found in branch " + branch.getName());
+				System.out.println("\nFound in branch " + branch.getName());
 				return findEditsForCommitInBranch(git.getRepository(), walk, commit, branch);
 
 			}
@@ -168,12 +167,14 @@ public class GitAdaptor {
 		walk.markStart(tip);
 
 		RevCommit mergeBase;
-		while ((mergeBase = walk.next()) != null)
+		while ((mergeBase = walk.next()) != null) {
+			System.out.print("c");
 			if (mergeBase.equals(base)) {
 				walk.release();
 				walk.dispose();
 				return true;
 			}
+		}
 		
 		walk.release();
 		walk.dispose();
