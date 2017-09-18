@@ -9,7 +9,6 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.io.Reader;
 import java.text.DateFormat;
-import java.text.MessageFormat;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
@@ -17,30 +16,20 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.ListBranchCommand.ListMode;
-import org.eclipse.jgit.api.PullResult;
-import org.eclipse.jgit.api.errors.CheckoutConflictException;
 import org.eclipse.jgit.api.errors.GitAPIException;
-import org.eclipse.jgit.api.errors.InvalidRefNameException;
 import org.eclipse.jgit.api.errors.InvalidRemoteException;
 import org.eclipse.jgit.api.errors.NoHeadException;
-import org.eclipse.jgit.api.errors.RefAlreadyExistsException;
-import org.eclipse.jgit.api.errors.RefNotFoundException;
 import org.eclipse.jgit.api.errors.TransportException;
 import org.eclipse.jgit.diff.DiffEntry;
 import org.eclipse.jgit.diff.DiffFormatter;
 import org.eclipse.jgit.diff.Edit;
 import org.eclipse.jgit.diff.Edit.Type;
 import org.eclipse.jgit.diff.EditList;
-import org.eclipse.jgit.errors.AmbiguousObjectException;
 import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.MissingObjectException;
-import org.eclipse.jgit.errors.RevisionSyntaxException;
-import org.eclipse.jgit.internal.storage.file.FileRepository;
-import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Repository;
@@ -108,24 +97,27 @@ public class GitAdaptor {
 
 		for (DiffEntry diff : entries) {
 
-			// Get the list of edits
-			FileHeader header = formatter.toFileHeader(diff);
-			EditList editlist = header.toEditList();
+			String path = diff.getNewPath();
+			if (!isExcludedPath(path)) {
 
-			for (Edit edit : editlist) {
+				// Get the list of edits
+				FileHeader header = formatter.toFileHeader(diff);
+				EditList editlist = header.toEditList();
 
-				int length = edit.getLengthB();
-				String path = diff.getNewPath();
-				if (edit.getType().equals(Type.DELETE)) {
-					length = edit.getLengthA();
-					path = diff.getOldPath();
+				for (Edit edit : editlist) {
+
+					int length = edit.getLengthB();
+					if (edit.getType().equals(Type.DELETE)) {
+						length = edit.getLengthA();
+						path = diff.getOldPath();
+					}
+
+					GitEdit gedit = new GitEdit(commit.getAuthorIdent().getName(), branch.getName(), commit.getName(),
+							path, edit.getType().toString(), edit.getBeginA(), length);
+
+					gedits.add(gedit);
+
 				}
-
-				GitEdit gedit = new GitEdit(commit.getAuthorIdent().getName(), branch.getName(), commit.getName(), path,
-						edit.getType().toString(), edit.getBeginA(), length);
-
-				gedits.add(gedit);
-
 			}
 
 		}
@@ -135,25 +127,24 @@ public class GitAdaptor {
 
 	private List<GitEdit> findEditsForCommit(Git git, RevCommit commit, List<Ref> branches)
 			throws MissingObjectException, IncorrectObjectTypeException, IOException, NoHeadException, GitAPIException {
-		RevCommit parent = null;
-
+		
 		RevWalk walk = new RevWalk(git.getRepository());
 
 		for (Ref branch : branches) {
-			
-			System.out.println("\nScanning branch: " + branch.getName());
+
+			// System.out.println("\nScanning branch: " + branch.getName());
 			// System.out.println("-------------------------------------");
 
 			RevCommit tip = walk.parseCommit(branch.getLeaf().getObjectId());
 			if (isMergedInto(git, commit, tip)) {
-				
+
 				System.out.println("\nFound in branch " + branch.getName());
 				return findEditsForCommitInBranch(git.getRepository(), walk, commit, branch);
 
 			}
 
 		}
-		
+
 		System.out.println("Not found in any branches");
 
 		return new ArrayList<GitEdit>();
@@ -168,14 +159,14 @@ public class GitAdaptor {
 
 		RevCommit mergeBase;
 		while ((mergeBase = walk.next()) != null) {
-			System.out.print("c");
+			// System.out.print("c");
 			if (mergeBase.equals(base)) {
 				walk.release();
 				walk.dispose();
 				return true;
 			}
 		}
-		
+
 		walk.release();
 		walk.dispose();
 		return false;
@@ -190,17 +181,20 @@ public class GitAdaptor {
 		Repository repository = git.getRepository();
 
 		ObjectId master = repository.resolve("refs/heads/master");
-		System.out.print("Finding un-merged commits.. ");
 
 		List<GitEdit> gedits = new ArrayList<GitEdit>();
 
 		List<Ref> branches = git.branchList().setListMode(ListMode.ALL).call();
 
+		removeExcludedBranches(branches);
+
+		System.out.print("Finding un-merged commits.. ");
+
 		Iterable<RevCommit> commits = git.log().all().not(master).call();
 
 		System.out.println("(Complete)");
 		for (RevCommit commit : commits) {
-			
+
 			System.out.print("Processing: " + commit.getName() + " - ");
 
 			if (commit.getParents().length < 2) { // Don't include merge commits
@@ -212,6 +206,46 @@ public class GitAdaptor {
 		}
 
 		writeFiles(gedits);
+
+	}
+
+	private void removeExcludedBranches(List<Ref> branches) {
+
+		for (Iterator<String> configIterator = config.getBranchExcludes().iterator(); configIterator.hasNext();) {
+
+			String excludeString = configIterator.next();
+
+			for (Iterator<Ref> i = branches.iterator(); i.hasNext();) {
+				Ref currentRef = i.next();
+				String branchName = currentRef.getName();
+
+				if (branchName.matches(excludeString)) {
+					System.out.println("Removing Branch " + currentRef.getName()
+							+ " because it matches exclude string '" + excludeString + "'");
+					i.remove();
+				}
+			}
+
+		}
+
+	}
+
+	private boolean isExcludedPath(String path) {
+
+		for (Iterator<String> configIterator = config.getPathExcludes().iterator(); configIterator.hasNext();) {
+
+			String excludeString = configIterator.next();
+
+			if (path.matches(excludeString)) {
+				System.out.println("Removing file " + path + " because it matches exclude string '"
+						+ excludeString + "'");
+				return true;
+				
+			}
+
+		}
+		
+		return false;
 
 	}
 
@@ -283,22 +317,18 @@ public class GitAdaptor {
 		return history;
 	}
 
-	private void loadHistoryFile() {
-
-	}
-
 	public void getCommitHistory() throws IOException, NoHeadException, GitAPIException {
 		File repositoryFile = new File(config.getLocalRepository());
 		Git git = null;
 
 		git = Git.open(repositoryFile);
-		
+
 		Iterable<RevCommit> commits = git.log().all().call();
-		
+
 		for (RevCommit commit : commits) {
 			Commit c = new Commit(commit);
-			
+
 		}
 	}
-	
+
 }
