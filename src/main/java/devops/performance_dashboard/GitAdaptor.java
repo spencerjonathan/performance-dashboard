@@ -16,6 +16,8 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
+
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.ListBranchCommand.ListMode;
 import org.eclipse.jgit.api.errors.GitAPIException;
@@ -113,8 +115,10 @@ public class GitAdaptor {
 						length = edit.getLengthA();
 						path = diff.getOldPath();
 					}
+					
+					String author = commit.getAuthorIdent().getName();
 
-					GitEdit gedit = new GitEdit(commit.getAuthorIdent().getName(), branch.getName(), commit.getName(),
+					GitEdit gedit = new GitEdit(author, config.team(author), branch.getName(), commit.getName(),
 							path, edit.getType().toString(), edit.getBeginA(), length);
 
 					gedits.add(gedit);
@@ -331,13 +335,41 @@ public class GitAdaptor {
 		Git git = null;
 
 		git = Git.open(repositoryFile);
+		
+		Date now = new Date();
+		long diff = TimeUnit.MILLISECONDS.convert(config.getHistoryDays(), TimeUnit.DAYS);
+		
+		Date start_period = new Date(now.getTime() - diff);
+		System.out.println("Looking for commits from " + start_period);
+				
 
 		Iterable<RevCommit> commits = git.log().all().call();
 
+		List<Commit> results = new ArrayList<Commit>();
+		
 		for (RevCommit commit : commits) {
-			Commit c = new Commit(commit);
+			Commit c = new Commit(commit, config);
+			
+			System.out.println("Processing " + c.getReference() + " " + c.getCommitTime());
+			
+			if (c.getCommitTime().getTime() > start_period.getTime()) {
+				results.add(c);
+			}
 
 		}
+		
+		
+		Gson gson = new Gson();
+		// Write git.js file
+		File output_file = new File("./git_history.js");
+		FileWriter writer = new FileWriter(output_file);
+
+		writer.write("var gitCommitHistoryData = ");
+		gson.toJson(results, writer);
+		writer.write(";");
+
+		writer.close();
+
 	}
 
 }

@@ -4,6 +4,7 @@
 <script type="text/javascript"
 	src="https://www.gstatic.com/charts/loader.js"></script>
 <script type="text/javascript" src="./git.js"></script>
+<script type="text/javascript" src="./git_history.js"></script>
 <script type="text/javascript">
 	// Load the Visualization API and the corechart package.
 	google.charts.load('current', {
@@ -19,6 +20,52 @@
 	// instantiates the pie chart, passes in the data and
 	// draws it.
 	function drawChart() {
+		drawWIPChart();
+		drawCommitHistoryChart();
+	}
+	
+	function drawCommitHistoryChart() {
+
+		var	data = [ [ "Commit Date", "Number Of Commits" ] ];
+
+		// Get distinct list of branches accross all dates
+		var commitsByDate = {};
+		gitCommitHistoryData.forEach(function(commit) {
+			
+			/* if (!commitsByDate[commit['commitTime']]) {
+				
+			} */
+			commitsByDate[commit['commitTime']] = (commitsByDate[commit['commitTime']] || 0) + 1;	
+		})
+		
+		for ( var date in commitsByDate) {
+			data = data.concat([ [ date, commitsByDate[date] ] ]);
+		}
+
+		data = google.visualization.arrayToDataTable(data);
+
+		var options = {
+			width : 600,
+			height : 400,
+			legend : {
+				position : 'top',
+				maxLines : 3
+			},
+			bar : {
+				groupWidth : '75%'
+			},
+			isStacked : true,
+		};
+
+		// Instantiate and draw our chart, passing in some options.
+		chart = new google.visualization.ColumnChart(document
+				.getElementById('history_chart_div'));
+		chart.draw(data, options);
+
+
+	}
+	
+	function drawWIPChart() {
 
 		var columns = [ "Date" ];
 
@@ -86,7 +133,7 @@
 
 		// Instantiate and draw our chart, passing in some options.
 		chart = new google.visualization.ColumnChart(document
-				.getElementById('chart_div'));
+				.getElementById('wip_chart_div'));
 		chart.draw(data, options);
 
 		// Every time the table fires the "select" event, it should call your
@@ -146,7 +193,7 @@
 
 		// Instantiate and draw our chart, passing in some options.
 		var detail_chart = new google.visualization.PieChart(document
-				.getElementById('detail_chart_div'));
+				.getElementById('detail_wip_chart_div'));
 		detail_chart.draw(detail_data, options);
 
 	}
@@ -156,8 +203,11 @@
 <body>
 
 	<h1>GIT Work In Progress</h1>
-	<!--Div that will hold the pie chart-->
-	<div id="chart_div"></div>
-	<div id="detail_chart_div"></div>
+	<div id="wip_chart_div"></div>
+	<div id="detail_wip_chart_div"></div>
+	
+	<h1>GIT Work In Progress</h1>
+	<div id="history_chart_div"></div>
+	
 </body>
 </html>

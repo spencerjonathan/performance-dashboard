@@ -1,6 +1,7 @@
 package devops.performance_dashboard;
 
 import java.util.List;
+import java.util.Map;
 
 public class Config {
 	private String username;
@@ -8,8 +9,10 @@ public class Config {
 	private String uri;
 	private String localRepository;
 	private boolean performPull;
+	private int historyDays;
 	private List<String> branchExcludes;
 	private List<String> pathExcludes;
+	private Map<String, Integer> authorToTeam;
 	
 	public Config(String username, String password, String uri, String localRepository) {
 		this.username = username;
@@ -73,6 +76,28 @@ public class Config {
 
 	public void setPathExcludes(List<String> pathExcludes) {
 		this.pathExcludes = pathExcludes;
+	}
+
+	public Map<String, Integer> getAuthorToTeam() {
+		return authorToTeam;
+	}
+	
+	public Integer team(String author) {
+		if (authorToTeam.get(author) != null)
+			return authorToTeam.get(author);
+		return -1;
+	}
+
+	public void setAuthorToTeam(Map<String, Integer> authorToTeam) {
+		this.authorToTeam = authorToTeam;
+	}
+
+	public int getHistoryDays() {
+		return historyDays;
+	}
+
+	public void setHistoryDays(int historyDays) {
+		this.historyDays = historyDays;
 	}
 	
 }

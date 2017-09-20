@@ -3,19 +3,22 @@ package devops.performance_dashboard;
 public class GitEdit {
 
 	private String author;
+	private Integer team;
 	private String branch;
 	private String revision;
 	private String path;
 	private String type;
 	private int begin;
 	private int length;
+	
 
-	public GitEdit(String author, String branch, String revision, String path, String type, int begin, int length) {
+	public GitEdit(String author, int team, String branch, String revision, String path, String type, int begin, int length) {
 		// TODO Auto-generated constructor stub
-		this.setAuthor(author);
+		this.author = author;
+		this.team=team;
 		this.branch=branch;
 		this.revision=revision;
-		this.setPath(path);
+		this.path = path;
 		this.type=type;
 		this.begin=begin;
 		this.length=length;
@@ -75,6 +78,14 @@ public class GitEdit {
 
 	public void setPath(String path) {
 		this.path = path;
+	}
+
+	public Integer getTeam() {
+		return team;
+	}
+
+	public void setTeam(Integer team) {
+		this.team = team;
 	}
 
 }
