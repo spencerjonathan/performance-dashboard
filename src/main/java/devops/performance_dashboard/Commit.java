@@ -1,7 +1,9 @@
 package devops.performance_dashboard;
 
+import java.util.Calendar;
 import java.util.Date;
 
+import org.apache.commons.lang3.time.DateUtils;
 import org.eclipse.jgit.revwalk.RevCommit;
 
 public class Commit {
@@ -40,8 +42,11 @@ public class Commit {
 	public Commit(RevCommit commit, Config config) {
 		this.author = commit.getAuthorIdent().getName();
 		
+		this.commitTime = new Date(new Long(commit.getCommitTime()) * new Long(1000));
+		
 		// Round to date
-		this.commitTime = 			new Date(new Long(commit.getCommitTime()/day) * new Long(1000) * day);
+		this.commitTime = DateUtils.truncate(commitTime, Calendar.DAY_OF_MONTH);
+		//this.commitTime = new Date(new Long(commit.getCommitTime()/day) * new Long(1000) * day);
 		this.reference = commit.getName();
 		this.team = config.team(author);
 	}

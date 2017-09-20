@@ -26,22 +26,50 @@
 	
 	function drawCommitHistoryChart() {
 
-		var	data = [ [ "Commit Date", "Number Of Commits" ] ];
+		
 
 		// Get distinct list of branches accross all dates
 		var commitsByDate = {};
+		
+		var columns = [];
+		
+		var teamsMap = { };
+		
 		gitCommitHistoryData.forEach(function(commit) {
 			
-			/* if (!commitsByDate[commit['commitTime']]) {
-				
-			} */
-			commitsByDate[commit['commitTime']] = (commitsByDate[commit['commitTime']] || 0) + 1;	
+			teamsMap[commit['team']] = 1;
+			
+			var dateMap = (commitsByDate[commit['commitTime']] || { }) ;
+			
+			dateMap[commit['team']] = (dateMap[commit['team']] || 0) + 1;
+			
+			commitsByDate[commit['commitTime']] = dateMap;
+			
 		})
+				
+		for ( var team in teamsMap) {
+			columns = columns.concat([ team ]);
+		}
+		
+		var tmpData = [ ];
 		
 		for ( var date in commitsByDate) {
-			data = data.concat([ [ date, commitsByDate[date] ] ]);
+			var record = [ date ];
+			var dateMap = commitsByDate[date];
+			
+			columns.forEach(function(team) {
+				record = record.concat([ (dateMap[team] || 0) ] );
+				
+			});
+			tmpData = tmpData.concat([ record ]);
 		}
+		
+		columnHeadings = [ "Date" ];
+		columnHeadings = columnHeadings.concat( columns );
 
+		var	data = [ columnHeadings ];
+		data = data.concat(tmpData);
+		
 		data = google.visualization.arrayToDataTable(data);
 
 		var options = {
@@ -58,9 +86,9 @@
 		};
 
 		// Instantiate and draw our chart, passing in some options.
-		chart = new google.visualization.ColumnChart(document
+		var historyChart = new google.visualization.ColumnChart(document
 				.getElementById('history_chart_div'));
-		chart.draw(data, options);
+		historyChart.draw(data, options);
 
 
 	}
