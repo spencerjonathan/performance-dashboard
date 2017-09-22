@@ -13,6 +13,7 @@ public class Config {
 	private List<String> branchExcludes;
 	private List<String> pathExcludes;
 	private Map<String, Integer> authorToTeam;
+	private String targetFolder;
 	
 	public Config(String username, String password, String uri, String localRepository) {
 		this.username = username;
@@ -98,6 +99,14 @@ public class Config {
 
 	public void setHistoryDays(int historyDays) {
 		this.historyDays = historyDays;
+	}
+
+	public String getTargetFolder() {
+		return targetFolder;
+	}
+
+	public void setTargetFolder(String targetFolder) {
+		this.targetFolder = targetFolder;
 	}
 	
 }

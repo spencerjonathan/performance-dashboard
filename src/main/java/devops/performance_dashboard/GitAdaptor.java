@@ -43,6 +43,7 @@ import org.eclipse.jgit.transport.UsernamePasswordCredentialsProvider;
 import org.eclipse.jgit.util.io.DisabledOutputStream;
 
 import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 import com.google.gson.reflect.TypeToken;
 
 public class GitAdaptor {
@@ -264,7 +265,8 @@ public class GitAdaptor {
 
 	private void writeFiles(List<GitEdit> gedits) throws IOException {
 
-		Gson gson = new Gson();
+		Gson gson = new GsonBuilder()
+				   .setDateFormat("yyyy-MM-dd").create();
 		Map<String, List<GitEdit>> history = loadHistory();
 
 		DateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd");
@@ -274,7 +276,7 @@ public class GitAdaptor {
 		history.put(current_date, gedits);
 
 		// Write git.js file
-		File output_file = new File("./git.js");
+		File output_file = new File(config.getTargetFolder() + "git.js");
 		FileWriter writer = new FileWriter(output_file);
 
 		writer.write("var gitWIPData = ");
@@ -361,7 +363,7 @@ public class GitAdaptor {
 		
 		Gson gson = new Gson();
 		// Write git.js file
-		File output_file = new File("./git_history.js");
+		File output_file = new File(config.getTargetFolder() + "git_history.js");
 		FileWriter writer = new FileWriter(output_file);
 
 		writer.write("var gitCommitHistoryData = ");

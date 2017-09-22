@@ -1,5 +1,23 @@
 <html>
 <head>
+
+<!-- Latest compiled and minified CSS -->
+<link rel="stylesheet"
+	href="./bootstrap-3.3.7-dist/css/bootstrap.min.css">
+
+<!-- Optional theme -->
+<link rel="stylesheet"
+	href="./bootstrap-3.3.7-dist/css/bootstrap-theme.min.css">
+
+<style>
+body {
+	background-color: #eee6ff;
+}
+</style>
+
+<!-- Latest compiled and minified JavaScript -->
+<script src="./bootstrap-3.3.7-dist/js/bootstrap.min.js"></script>
+
 <!--Load the AJAX API-->
 <script type="text/javascript"
 	src="https://www.gstatic.com/charts/loader.js"></script>
@@ -23,58 +41,56 @@
 		drawWIPChart();
 		drawCommitHistoryChart();
 	}
-	
-	function drawCommitHistoryChart() {
 
-		
+	function drawCommitHistoryChart() {
 
 		// Get distinct list of branches accross all dates
 		var commitsByDate = {};
-		
+
 		var columns = [];
-		
-		var teamsMap = { };
-		
+
+		var teamsMap = {};
+
 		gitCommitHistoryData.forEach(function(commit) {
-			
+
 			teamsMap[commit['team']] = 1;
-			
-			var dateMap = (commitsByDate[commit['commitTime']] || { }) ;
-			
+
+			var dateMap = (commitsByDate[commit['commitTime']] || {});
+
 			dateMap[commit['team']] = (dateMap[commit['team']] || 0) + 1;
-			
+
 			commitsByDate[commit['commitTime']] = dateMap;
-			
+
 		})
-				
+
 		for ( var team in teamsMap) {
 			columns = columns.concat([ team ]);
 		}
-		
-		var tmpData = [ ];
-		
+
+		var tmpData = [];
+
 		for ( var date in commitsByDate) {
 			var record = [ date ];
 			var dateMap = commitsByDate[date];
-			
+
 			columns.forEach(function(team) {
-				record = record.concat([ (dateMap[team] || 0) ] );
-				
+				record = record.concat([ (dateMap[team] || 0) ]);
+
 			});
 			tmpData = tmpData.concat([ record ]);
 		}
-		
-		columnHeadings = [ "Date" ];
-		columnHeadings = columnHeadings.concat( columns );
 
-		var	data = [ columnHeadings ];
+		columnHeadings = [ "Date" ];
+		columnHeadings = columnHeadings.concat(columns);
+
+		var data = [ columnHeadings ];
 		data = data.concat(tmpData);
-		
+
 		data = google.visualization.arrayToDataTable(data);
 
 		var options = {
-			width : 600,
-			height : 400,
+			width : 1000,
+			height : 800,
 			legend : {
 				position : 'top',
 				maxLines : 3
@@ -90,9 +106,8 @@
 				.getElementById('history_chart_div'));
 		historyChart.draw(data, options);
 
-
 	}
-	
+
 	function drawWIPChart() {
 
 		var columns = [ "Date" ];
@@ -147,8 +162,8 @@
 		data = google.visualization.arrayToDataTable(data);
 
 		var options = {
-			width : 600,
-			height : 400,
+			width : 1000,
+			height : 800,
 			legend : {
 				position : 'top',
 				maxLines : 3
@@ -207,8 +222,8 @@
 		detail_data = google.visualization.arrayToDataTable(detail_data);
 
 		var options = {
-			width : 600,
-			height : 400,
+			width : 1000,
+			height : 1000,
 			legend : {
 				position : 'top',
 				maxLines : 3
@@ -219,6 +234,8 @@
 			isStacked : true,
 		};
 
+		document.getElementById("detail_wip_chart_panel").style.display = "block";
+		
 		// Instantiate and draw our chart, passing in some options.
 		var detail_chart = new google.visualization.PieChart(document
 				.getElementById('detail_wip_chart_div'));
@@ -230,12 +247,53 @@
 
 <body>
 
-	<h1>GIT Work In Progress</h1>
-	<div id="wip_chart_div"></div>
-	<div id="detail_wip_chart_div"></div>
-	
-	<h1>GIT Work In Progress</h1>
-	<div id="history_chart_div"></div>
-	
+	<div class="container">
+		<div class="blog-header">
+			<h1>Performance Dashboard</h1>
+			<p class="lead blog-description">The set of measures by which the
+				software delivery team measures it's performance.</p>
+		</div>
+
+		<div class="row">
+
+			<div class="col-sm-12 blog-main">
+
+				<div class="panel panel-default">
+					<div class="container">
+						<div class="blog-header">
+							<h2>Work-In-Progress (Inventory)</h2>
+							<p class="lead blog-description">A measure of the amount of
+								work done that hasn't been merged into master. (The lower the
+								WIP the better)</p>
+						</div>
+					</div>
+					<div id="wip_chart_div" class="panel-body"></div>
+				</div>
+
+				<!--  Detail WIP Chart  -->
+				<div id="detail_wip_chart_panel" class="panel panel-default"
+					style="display: none;">
+					<div class="container">
+						<div class="blog-header">
+							<h3>Work-In-Progress (Inventory) Detail</h3>
+						</div>
+					</div>
+					<div id="detail_wip_chart_div" class="panel-body"></div>
+				</div>
+
+				<div class="panel panel-default">
+					<div class="container">
+						<div class="blog-header">
+							<h2>Rate of Commits (to source-code repository)</h2>
+							<p class="lead blog-description">A measure of the frequency
+								at which each team is committing change to the source code
+								repository. (The higher the frequency the better)</p>
+						</div>
+					</div>
+					<div id="history_chart_div" class="panel-body"></div>
+				</div>
+			</div>
+		</div>
+	</div>
 </body>
 </html>
