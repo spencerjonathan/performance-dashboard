@@ -5,10 +5,6 @@
 <link rel="stylesheet"
 	href="./bootstrap-3.3.7-dist/css/bootstrap.min.css">
 
-<!-- Optional theme -->
-<link rel="stylesheet"
-	href="./bootstrap-3.3.7-dist/css/bootstrap-theme.min.css">
-
 <style>
 body {
 	background-color: #eee6ff;
@@ -16,7 +12,7 @@ body {
 </style>
 
 <!-- Latest compiled and minified JavaScript -->
-<script src="./bootstrap-3.3.7-dist/js/bootstrap.min.js"></script>
+
 
 <!--Load the AJAX API-->
 <script type="text/javascript"
@@ -38,13 +34,15 @@ body {
 	// instantiates the pie chart, passes in the data and
 	// draws it.
 	function drawChart() {
+		drawWIPButtons(document.getElementById('wip_button_group'),
+				getMeasures());
 		drawWIPChart();
 		drawCommitHistoryChart();
 	}
 
 	function drawCommitHistoryChart() {
 
-		// Get distinct list of branches accross all dates
+		// Get distinct list of dimensions accross all dates
 		var commitsByDate = {};
 
 		var columns = [];
@@ -108,56 +106,109 @@ body {
 
 	}
 
-	function drawWIPChart() {
+	// Return a map of fields to Field-Titles
+	function getMeasures() {
+		// Hard Coded for now
+		return {
+			"author" : "Author",
+			"revision" : "Revision",
+			"branch" : "Branch",
+			"type" : "Type",
+			"path" : "Path"
+		};
+	}
 
-		var columns = [ "Date" ];
+	function createButton(text) {
+		var button = document.createElement("button");
+		button.innerHTML = text;
+		button.className = "btn btn-default";
+
+		return button;
+	}
+
+	function drawWIPButtons(element, measures) {
+
+		for ( var measure in measures) {
+			var button = createButton(measures[measure]);
+			element.appendChild(button);
+
+			// 3. Add event handler
+			addListener(button, measure);
+		}
+	}
+
+	function drawWIPDetailButtons(element, exclude_measure, measures) {
+
+		for ( var measure in measures) {
+			if (measure != exclude_measure) {
+				var button = createButton(measures[measure]);
+				element.appendChild(button);
+				addDetailListener(button, measure);
+			}
+		}
+	}
+
+	function addListener(element, parameter) {
+		element.addEventListener("click", function() {
+			drawWIPChart(parameter);
+		});
+	}
+	
+	function addDetailListener(element, parameter) {
+		element.addEventListener("click", function() {
+			drawDetailChart(date, detail_measure, value);
+		});
+	}
+
+	var wip_measure = 'branch';
+
+	function drawWIPChart(measure) {
+
+		// Set default to branch
+		wip_measure = measure;
+		if (wip_measure === undefined) {
+			wip_measure = 'branch';
+		}
+		
 
 		data = [];
 		var tmp_data3 = [];
 
-		// Get distinct list of branches accross all dates
-		var branches = {};
+		// Get distinct list of dimensions accross all dates
+		var dimensions = {};
 		for ( var date in gitWIPData) {
 			gitWIPData[date].forEach(function(edit) {
-				branches[edit.branch] = 1;
+				dimensions[edit[wip_measure]] = 1;
 			});
 		}
 
-		for ( var branch in branches) {
-			columns.push(branch);
+		// Create the distinct list of columns
+		var columns = [ "Date" ]; // First column heading will be "Date" 
+		for ( var dimension in dimensions) {
+			columns.push(dimension);
 		}
 
 		for ( var date in gitWIPData) {
 
 			var tmp_data = {};
 			gitWIPData[date].forEach(function(edit) {
-				if (tmp_data[edit.branch] == null)
-					tmp_data[edit.branch] = 0;
-				tmp_data[edit.branch] += edit.length;
+				if (tmp_data[edit[wip_measure]] == null)
+					tmp_data[edit[wip_measure]] = 0;
+				tmp_data[edit[wip_measure]] += edit.length;
 			});
 
 			var tmp_data2 = [ date ];
-			for ( var branch in branches) {
-				var val = tmp_data[branch] || 0;
+			for ( var dimension in dimensions) {
+				var val = tmp_data[dimension] || 0;
 				tmp_data2.push(val);
 			}
 
 			tmp_data3 = tmp_data3.concat([ tmp_data2 ]);
 		}
 
+		// Create the two dimensional data array then convert to a DataTable object
 		data = data.concat([ columns ]);
 		data = data.concat(tmp_data3);
-
-		/* gitWIPData.forEach(function (edit) {
-		  //columns.push(edit.branch);
-		  if (tmp_data[edit.branch] == null) tmp_data[edit.branch] = 0;
-		  tmp_data[edit.branch] += edit.length;
-		});
-		
-		for(var branch in tmp_data) {
-		  columns.push(branch);
-		  data.push(tmp_data[branch]);
-		}; */
 
 		data = google.visualization.arrayToDataTable(data);
 
@@ -187,36 +238,42 @@ body {
 
 	var chart;
 
+	// Handler for clicking on a data item in the WIPChart
 	function selectHandler() {
 
 		var selection = chart.getSelection();
 
 		var date = data.getValue(selection[0].row, 0);
-		var branch = data.getColumnLabel(selection[0].column)
+		var value = data.getColumnLabel(selection[0].column)
 		//alert('A table row was selected: ' + date + ", column: " + branch);
 
-		drawDetailChart(date, branch);
+		drawWIPDetailButtons(document.getElementById('wip_detail_button_group'), wip_measure, getMeasures());
+		
+		drawDetailChart(date, wip_measure, value);
 	}
 
-	function drawDetailChart(date, branch) {
+	var detail_measure = "path";
+
+	function drawDetailChart(date, measure, value) {
 		var gedits = gitWIPData[date];
 
 		var file_assoc = {};
 		var detail_data = [];
 
-		gedits.forEach(function(gedit) {
-			if (gedit['branch'] == branch) {
-				file_assoc[gedit['path']] = (file_assoc[gedit['path']] || 0)
-						+ gedit['length'];
-			}
-		});
+		gedits
+				.forEach(function(gedit) {
+					if (gedit[wip_measure] == value) {
+						file_assoc[gedit[detail_measure]] = (file_assoc[gedit[detail_measure]] || 0)
+								+ gedit['length'];
+					}
+				});
 
 		for ( var key in file_assoc) {
 			var row = [ key, file_assoc[key] ];
 			detail_data.push(row);
 		}
 
-		var columns = [ "path", "changes" ];
+		var columns = [ detail_measure, "changes" ];
 		detail_data.unshift(columns);
 
 		detail_data = google.visualization.arrayToDataTable(detail_data);
@@ -235,7 +292,7 @@ body {
 		};
 
 		document.getElementById("detail_wip_chart_panel").style.display = "block";
-		
+
 		// Instantiate and draw our chart, passing in some options.
 		var detail_chart = new google.visualization.PieChart(document
 				.getElementById('detail_wip_chart_div'));
@@ -266,7 +323,10 @@ body {
 								work done that hasn't been merged into master. (The lower the
 								WIP the better)</p>
 						</div>
+						<div id="wip_button_group" class="btn-group" role="group"
+							aria-label="Choose Breakdown"></div>
 					</div>
+
 					<div id="wip_chart_div" class="panel-body"></div>
 				</div>
 
@@ -277,7 +337,10 @@ body {
 						<div class="blog-header">
 							<h3>Work-In-Progress (Inventory) Detail</h3>
 						</div>
+						<div id="wip_detail_button_group" class="btn-group" role="group"
+							aria-label="Choose Breakdown"></div>
 					</div>
+					
 					<div id="detail_wip_chart_div" class="panel-body"></div>
 				</div>
 
@@ -295,5 +358,10 @@ body {
 			</div>
 		</div>
 	</div>
+
+	<script
+		src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.4/jquery.min.js"></script>
+	<script src="./bootstrap-3.3.7-dist/js/bootstrap.min.js"></script>
+
 </body>
 </html>
