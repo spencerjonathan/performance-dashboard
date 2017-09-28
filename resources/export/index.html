@@ -114,7 +114,8 @@ body {
 			"revision" : "Revision",
 			"branch" : "Branch",
 			"type" : "Type",
-			"path" : "Path"
+			"path" : "Path",
+			"team" : "Team"
 		};
 	}
 
@@ -137,10 +138,11 @@ body {
 		}
 	}
 
-	function drawWIPDetailButtons(element, exclude_measure, measures) {
+	function drawWIPDetailButtons(element, measures) {
 
+		element.innerHTML = "";
 		for ( var measure in measures) {
-			if (measure != exclude_measure) {
+			if (measure != wip_measure) {
 				var button = createButton(measures[measure]);
 				element.appendChild(button);
 				addDetailListener(button, measure);
@@ -156,7 +158,8 @@ body {
 	
 	function addDetailListener(element, parameter) {
 		element.addEventListener("click", function() {
-			drawDetailChart(date, detail_measure, value);
+			detail_measure = parameter;
+			drawDetailChart(detail_measure);
 		});
 	}
 
@@ -237,6 +240,9 @@ body {
 	}
 
 	var chart;
+	
+	var wipChartValueSelection;
+	var wipChartDateSelection;
 
 	// Handler for clicking on a data item in the WIPChart
 	function selectHandler() {
@@ -246,23 +252,26 @@ body {
 		var date = data.getValue(selection[0].row, 0);
 		var value = data.getColumnLabel(selection[0].column)
 		//alert('A table row was selected: ' + date + ", column: " + branch);
-
-		drawWIPDetailButtons(document.getElementById('wip_detail_button_group'), wip_measure, getMeasures());
 		
-		drawDetailChart(date, wip_measure, value);
+		wipChartDateSelection = date;
+		wipChartValueSelection = value;
+		
+		drawWIPDetailButtons(document.getElementById('wip_detail_button_group'), getMeasures() );
+		
+		drawDetailChart();
 	}
 
 	var detail_measure = "path";
 
-	function drawDetailChart(date, measure, value) {
-		var gedits = gitWIPData[date];
-
+	function drawDetailChart(measure) {
+		var gedits = gitWIPData[wipChartDateSelection];
+		
 		var file_assoc = {};
 		var detail_data = [];
 
 		gedits
 				.forEach(function(gedit) {
-					if (gedit[wip_measure] == value) {
+					if (gedit[wip_measure] == wipChartValueSelection) {
 						file_assoc[gedit[detail_measure]] = (file_assoc[gedit[detail_measure]] || 0)
 								+ gedit['length'];
 					}
