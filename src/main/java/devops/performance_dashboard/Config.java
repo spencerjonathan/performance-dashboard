@@ -8,12 +8,15 @@ public class Config {
 	private String password;
 	private String uri;
 	private String localRepository;
+	private String releaseBranchPattern;
 	private boolean performPull;
 	private int historyDays;
 	private List<String> branchExcludes;
 	private List<String> pathExcludes;
 	private Map<String, Integer> authorToTeam;
 	private String targetFolder;
+	private String jiraUri;
+	private String jiraProject;
 	
 	public Config(String username, String password, String uri, String localRepository) {
 		this.username = username;
@@ -107,6 +110,30 @@ public class Config {
 
 	public void setTargetFolder(String targetFolder) {
 		this.targetFolder = targetFolder;
+	}
+
+	public String getJiraUri() {
+		return jiraUri;
+	}
+
+	public void setJiraUri(String jiraUri) {
+		this.jiraUri = jiraUri;
+	}
+
+	public String getJiraProject() {
+		return jiraProject;
+	}
+
+	public void setJiraProject(String jiraProject) {
+		this.jiraProject = jiraProject;
+	}
+
+	public String getReleaseBranchPattern() {
+		return releaseBranchPattern;
+	}
+
+	public void setReleaseBranchPattern(String releaseBranchPattern) {
+		this.releaseBranchPattern = releaseBranchPattern;
 	}
 	
 }

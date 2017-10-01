@@ -19,6 +19,7 @@ body {
 	src="https://www.gstatic.com/charts/loader.js"></script>
 <script type="text/javascript" src="./git.js"></script>
 <script type="text/javascript" src="./git_history.js"></script>
+<script type="text/javascript" src="./cycle_times.js"></script>
 <script type="text/javascript">
 	// Load the Visualization API and the corechart package.
 	google.charts.load('current', {
@@ -38,6 +39,7 @@ body {
 				getMeasures());
 		drawWIPChart();
 		drawCommitHistoryChart();
+		drawCycleTimeChart();
 	}
 
 	function drawCommitHistoryChart() {
@@ -308,6 +310,36 @@ body {
 		detail_chart.draw(detail_data, options);
 
 	}
+	
+	function drawCycleTimeChart() {
+        var data = new google.visualization.DataTable();
+        data.addColumn('string', 'x');
+        data.addColumn('number', 'values');
+        data.addColumn({id:'stddev', type:'number', role:'interval'});
+        data.addColumn({id:'stddev', type:'number', role:'interval'});
+        data.addColumn({id:'highlow', type:'number', role:'interval'});
+        data.addColumn({id:'highlow', type:'number', role:'interval'});
+        
+        cycleTimesData.forEach (function (record) {
+        	var stdevLow = record['meanWait'] - record['waitStdDev'];
+        	var stdevHigh = record['meanWait'] + record['waitStdDev'];
+        	var row = [ record['releaseName'], record['meanWait'], stdevLow, stdevHigh, record['minWait'], record['maxWait']];
+        	data.addRows([row]);
+        }); 
+   
+        // The intervals data as narrow lines (useful for showing raw source data)
+        var options_lines = {
+            title: 'Line intervals, default',
+            curveType: 'function',
+            lineWidth: 4,
+            intervals: { 'style':'line' },
+            legend: 'none'
+        };
+  
+        var chart_lines = new google.visualization.LineChart(document.getElementById('cycle_time_chart_div'));
+        chart_lines.draw(data, options_lines);
+      }
+
 </script>
 </head>
 
@@ -363,6 +395,16 @@ body {
 						</div>
 					</div>
 					<div id="history_chart_div" class="panel-body"></div>
+				</div>
+				
+				<div class="panel panel-default">
+					<div class="container">
+						<div class="blog-header">
+							<h2>Cycle Time (source-code commit to production)</h2>
+							<p class="lead blog-description">A measure of how long it takes code-commits to get into production. (The lower the wait the better)</p>
+						</div>
+					</div>
+					<div id="cycle_time_chart_div" class="panel-body"></div>
 				</div>
 			</div>
 		</div>

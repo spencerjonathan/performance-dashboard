@@ -11,6 +11,7 @@ import java.io.Reader;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -49,14 +50,17 @@ import com.google.gson.reflect.TypeToken;
 public class GitAdaptor {
 
 	private Config config;
+	private Git git;
 
-	public GitAdaptor(Config config) {
+	public GitAdaptor(Config config) throws InvalidRemoteException, TransportException, GitAPIException, IOException {
 		System.out.println("Constructing GitAdaptor");
 		this.config = config;
 
+		this.git = getGit();
 	}
 
-	private Git getUpdatedRepository() throws InvalidRemoteException, TransportException, GitAPIException, IOException {
+	private Git getGit() throws InvalidRemoteException, TransportException, GitAPIException, IOException {
+
 		File repositoryFile = new File(config.getLocalRepository());
 		Git git = null;
 
@@ -72,9 +76,14 @@ public class GitAdaptor {
 
 		git = Git.open(repositoryFile);
 
+		return git;
+	}
+
+	public Git updateRepository() throws InvalidRemoteException, TransportException, GitAPIException, IOException {
+
 		if (config.getPerformPull()) {
 			System.out.print("Executing Git Pull to update local repository.. ");
-			//git.pull().call();
+			// git.pull().call();
 			git.fetch().setCheckFetchedObjects(true).call();
 			System.out.println("(Complete)");
 		} else {
@@ -117,11 +126,11 @@ public class GitAdaptor {
 						length = edit.getLengthA();
 						path = diff.getOldPath();
 					}
-					
+
 					String author = commit.getAuthorIdent().getName();
 
-					GitEdit gedit = new GitEdit(author, config.team(author), branch.getName(), commit.getName(),
-							path, edit.getType().toString(), edit.getBeginA(), length);
+					GitEdit gedit = new GitEdit(author, config.team(author), branch.getName(), commit.getName(), path,
+							edit.getType().toString(), edit.getBeginA(), length);
 
 					gedits.add(gedit);
 
@@ -135,13 +144,10 @@ public class GitAdaptor {
 
 	private List<GitEdit> findEditsForCommit(Git git, RevCommit commit, List<Ref> branches)
 			throws MissingObjectException, IncorrectObjectTypeException, IOException, NoHeadException, GitAPIException {
-		
+
 		RevWalk walk = new RevWalk(git.getRepository());
 
 		for (Ref branch : branches) {
-
-			// System.out.println("\nScanning branch: " + branch.getName());
-			// System.out.println("-------------------------------------");
 
 			RevCommit tip = walk.parseCommit(branch.getLeaf().getObjectId());
 			if (isMergedInto(git, commit, tip)) {
@@ -152,6 +158,8 @@ public class GitAdaptor {
 			}
 
 		}
+
+		walk.dispose();
 
 		System.out.println("Not found in any branches");
 
@@ -183,8 +191,6 @@ public class GitAdaptor {
 
 	public void getUnMergedChanges() throws CorruptObjectException, MissingObjectException, IOException,
 			InvalidRemoteException, TransportException, GitAPIException {
-
-		Git git = getUpdatedRepository();
 
 		Repository repository = git.getRepository();
 
@@ -244,30 +250,29 @@ public class GitAdaptor {
 
 			String excludeString = configIterator.next();
 
-			if (newPath.matches(excludeString) ) {
-				System.out.println("Ignoring file " + newPath + " because it matches exclude string '"
-						+ excludeString + "'");
+			if (newPath.matches(excludeString)) {
+				System.out.println(
+						"Ignoring file " + newPath + " because it matches exclude string '" + excludeString + "'");
 				return true;
-				
+
 			}
-			
-			if (oldPath.matches(excludeString) ) {
-				System.out.println("Ignoring file " + newPath + " because it matches exclude string '"
-						+ excludeString + "'");
+
+			if (oldPath.matches(excludeString)) {
+				System.out.println(
+						"Ignoring file " + newPath + " because it matches exclude string '" + excludeString + "'");
 				return true;
-				
+
 			}
 
 		}
-		
+
 		return false;
 
 	}
 
 	private void writeFiles(List<GitEdit> gedits) throws IOException {
 
-		Gson gson = new GsonBuilder()
-				   .setDateFormat("yyyy-MM-dd").create();
+		Gson gson = new GsonBuilder().setDateFormat("yyyy-MM-dd").create();
 		Map<String, List<GitEdit>> history = loadHistory();
 
 		DateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd");
@@ -338,30 +343,28 @@ public class GitAdaptor {
 		Git git = null;
 
 		git = Git.open(repositoryFile);
-		
+
 		Date now = new Date();
 		long diff = TimeUnit.MILLISECONDS.convert(config.getHistoryDays(), TimeUnit.DAYS);
-		
+
 		Date start_period = new Date(now.getTime() - diff);
 		System.out.println("Looking for commits from " + start_period);
-				
 
 		Iterable<RevCommit> commits = git.log().all().call();
 
 		List<Commit> results = new ArrayList<Commit>();
-		
+
 		for (RevCommit commit : commits) {
 			Commit c = new Commit(commit, config);
-			
+
 			System.out.println("Processing " + c.getReference() + " " + c.getCommitTime());
-			
+
 			if (c.getCommitTime().getTime() > start_period.getTime()) {
 				results.add(c);
 			}
 
 		}
-		
-		
+
 		Gson gson = new Gson();
 		// Write git.js file
 		File output_file = new File(config.getTargetFolder() + "git_history.js");
@@ -373,6 +376,74 @@ public class GitAdaptor {
 
 		writer.close();
 
+	}
+
+	public Map<Commit, JiraVersion> getCommitsByVersion(List<JiraVersion> jiraVersions) throws GitAPIException, MissingObjectException, IncorrectObjectTypeException, IOException {
+
+		Map<Commit, JiraVersion> returnValue = new HashMap<Commit, JiraVersion>();
+
+		// Get the version in order of release date
+		Collections.sort(jiraVersions);
+
+		List<Ref> releaseBranches = getReleaseBranches();
+		
+		for (JiraVersion jv : jiraVersions) {
+		
+			for (Ref branch : releaseBranches) {
+				if (branch.getName().matches(".*\\/" + jv.getName())) {
+					System.out.println("Matched JiraVersion " + jv.getName() + " with Branch " + branch.getName());
+					addReleaseCommits(branch, jv, returnValue);
+				}
+			}
+			
+		}
+
+		return returnValue;
+	}
+
+	private void addReleaseCommits(Ref branch, JiraVersion jiraVersion, Map<Commit, JiraVersion> returnValue)
+			throws MissingObjectException, IncorrectObjectTypeException, IOException {
+		// TODO Auto-generated method stub
+
+		RevWalk walk = new RevWalk(git.getRepository());
+
+		RevCommit rc = walk.parseCommit(branch.getObjectId());
+
+		walk.markStart(rc);
+
+		RevCommit current;
+		while ((current = walk.next()) != null) {
+			// System.out.print("c");
+
+			// Don't want to consider merge commits
+			if (current.getParentCount() < 2) {
+				Commit c = new Commit(current, config);
+				if (!returnValue.containsKey(c)) {
+					returnValue.put(c, jiraVersion);
+				}
+			}
+
+		}
+
+		walk.release();
+		walk.dispose();
+
+	}
+
+	private List<Ref> getReleaseBranches() throws GitAPIException {
+		List<Ref> branches = git.branchList().setListMode(ListMode.ALL).call();
+
+		for (Iterator<Ref> i = branches.iterator(); i.hasNext();) {
+			Ref branch = i.next();
+
+			if (!branch.getName().matches(config.getReleaseBranchPattern())) {
+				System.out.println("Excluding " + branch.getName() + " from list of release branches");
+				i.remove();
+			}
+
+		}
+
+		return branches;
 	}
 
 }

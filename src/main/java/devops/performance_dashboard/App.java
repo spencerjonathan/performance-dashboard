@@ -5,17 +5,26 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.FileReader;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.Reader;
 import java.net.URL;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.Enumeration;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.NoHeadException;
+import org.eclipse.jgit.errors.IncorrectObjectTypeException;
+import org.eclipse.jgit.errors.MissingObjectException;
 
 import com.google.gson.Gson;
 
@@ -29,7 +38,16 @@ public class App {
 
 		Config config = loadConfig();
 
-		GitAdaptor adaptor = new GitAdaptor(config);
+		GitAdaptor gitAdaptor = null;
+		try {
+			gitAdaptor = new GitAdaptor(config);
+			gitAdaptor.updateRepository();
+		} catch (GitAPIException | IOException e2) {
+			e2.printStackTrace();
+			System.exit(-1);
+		}
+
+		JiraAdaptor jiraAdaptor = new JiraAdaptor(config);
 
 		App app = new App();
 
@@ -39,16 +57,82 @@ public class App {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
-		
+
+		List<JiraVersion> jiraVersions = null;
+
 		try {
-			adaptor.getUnMergedChanges();
+			jiraVersions = jiraAdaptor.getProjectVersions();
+		} catch (IOException e1) {
+			// TODO Auto-generated catch block
+			e1.printStackTrace();
+		}
+
+		Map<Commit, JiraVersion> releaseCommits = null;
+		try {
+			releaseCommits = gitAdaptor.getCommitsByVersion(jiraVersions);
+		} catch (GitAPIException e1) {
+			// TODO Auto-generated catch block
+			e1.printStackTrace();
+		} catch (MissingObjectException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (IncorrectObjectTypeException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+
+		Map<JiraVersion, List<Commit>> commitsByVersion = new HashMap<JiraVersion, List<Commit>>();
+
+		for (Commit c : releaseCommits.keySet()) {
+			System.out.println("Commit: " + c + " went live in " + releaseCommits.get(c));
+
+			if (!commitsByVersion.containsKey(releaseCommits.get(c))) {
+				commitsByVersion.put(releaseCommits.get(c), new ArrayList<Commit>());
+			}
+
+			commitsByVersion.get(releaseCommits.get(c)).add(c);
+
+		}
+
+		List<CycleTimeRecord> cycleTimeRecords = new ArrayList<CycleTimeRecord>();
+
+		for (JiraVersion jv : commitsByVersion.keySet()) {
+			CycleTimeRecord ctr = new CycleTimeRecord(jv, commitsByVersion.get(jv));
+			cycleTimeRecords.add(ctr);
+		}
+		
+		Collections.sort(cycleTimeRecords);
+
+		Gson gson = new Gson();
+		// Write git.js file
+		File output_file = new File(config.getTargetFolder() + "cycle_times.js");
+		FileWriter writer = null;
+		try {
+			writer = new FileWriter(output_file);
+
+			writer.write("var cycleTimesData = ");
+			gson.toJson(cycleTimeRecords, writer);
+			writer.write(";");
+
+			writer.close();
+
+		} catch (IOException e1) {
+			// TODO Auto-generated catch block
+			e1.printStackTrace();
+		}
+
+		try {
+			gitAdaptor.getUnMergedChanges();
 		} catch (IOException | GitAPIException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
 
 		try {
-			adaptor.getCommitHistory();
+			gitAdaptor.getCommitHistory();
 		} catch (NoHeadException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
@@ -98,29 +182,29 @@ public class App {
 
 		if (jarFile.isFile()) { // Run with JAR file
 			final JarFile jar = new JarFile(jarFile);
-			final Enumeration<JarEntry> entries = jar.entries(); // gives ALL
-																	// entries
-																	// in jar
+
+			// gives ALL entries in jar
+			final Enumeration<JarEntry> entries = jar.entries();
 			while (entries.hasMoreElements()) {
 				final String name = entries.nextElement().getName();
 				// System.out.println(name);
 				if (name.startsWith(path + "/")) { // filter according to the
 													// path
-					
-					String targetName  = config.getTargetFolder();
+
+					String targetName = config.getTargetFolder();
 					targetName = targetName.concat(name.replaceAll("^export\\/", ""));
 					System.out.println("Creating " + targetName);
-					
+
 					File file = new File(targetName);
 					if (targetName.endsWith("/")) {
 						if (!file.exists()) {
-							
+
 							file.mkdir();
 						}
 					} else {
 						exportResource(name, targetName);
 					}
-					//System.out.println(name);
+
 				}
 			}
 			jar.close();
@@ -132,10 +216,9 @@ public class App {
 	public void exportResource(String resourceName, String target) throws Exception {
 		InputStream stream = null;
 		OutputStream resStreamOut = null;
-		
+
 		System.out.println("Copying " + resourceName + " to " + target);
 
-		
 		// String jarFolder;
 		try {
 			stream = App.class.getResourceAsStream("/" + resourceName);
