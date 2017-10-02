@@ -11,6 +11,8 @@ import java.net.URL;
 import java.util.List;
 import java.util.Map;
 
+import org.apache.commons.codec.binary.Base64;
+
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 
@@ -18,25 +20,34 @@ public class JiraAdaptor {
 	
 	//private Config config;
 	private final String versionsLocation;
-
+	private Config config;
+	
+	
 	public JiraAdaptor(Config config) {
 		System.out.println("Constructing JiraAdaptor");
-		//this.config = config;
+		this.config = config;
 		
 		this.versionsLocation = config.getJiraUri() + "/rest/api/2/project/" + config.getJiraProject() + "/versions";
 		
 		// Setup username and password authentication
-		Authenticator.setDefault (new Authenticator() {
+		/*Authenticator.setDefault (new Authenticator() {
 		    protected PasswordAuthentication getPasswordAuthentication() {
 		        return new PasswordAuthentication (config.getUsername(), config.getPassword().toCharArray());
 		    }
-		});
+		});*/
 	}
 	
 	public List<JiraVersion> getProjectVersions() throws IOException {
 		System.out.println("Requesting release versions from JIRA from: " + versionsLocation);
 		URL url = new URL(versionsLocation);
 		HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+		
+		String authString = config.getUsername() + ":" + config.getPassword();
+		System.out.println("auth string: " + authString);
+		byte[] authEncBytes = Base64.encodeBase64(authString.getBytes());
+		String authStringEnc = new String(authEncBytes);
+		System.out.println("Base64 encoded auth string: " + authStringEnc);
+		conn.setRequestProperty("Authorization", "Basic " + authStringEnc);
 		
 		conn.setDoOutput(true);
 		conn.setRequestMethod("GET");
