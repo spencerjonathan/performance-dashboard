@@ -385,6 +385,14 @@ body {
 
 		cycleTimesData.forEach(function(record) {
 			if (record['releaseName'] == release) {
+				
+				document.getElementById("cycle_time_detail_table_description").innerHTML = 
+					"The table table below shows commits for version " + release + 
+					" with release date of " + record['releaseDate'] + 
+					".  On average, commits had to wait " + record['meanWait'] +
+					" days before being released in this version.  The earliest commit that was first released to production in this release was done " + record['maxWait'] +
+					" days before the release.  The Standard Deviation for the distribution of commit-dates for this release is " + record['waitStdDev'] + " days.";
+				
 				record['commits'].forEach(function(commit) {
 					var link = "<a href='" + commitLookupURI + commit['reference'] + "'>" + commit['reference'] + "</a>"; 
 					
@@ -399,7 +407,11 @@ body {
 		var table = new google.visualization.Table(document
 				.getElementById('cycle_time_table_div'));
 		
-		document.getElementById("detail_wip_detail_table_panel").style.display = "block";
+		document.getElementById("cycle_time_detail_table_panel").style.display = "block";
+		
+		   
+		
+		
 
 		table.draw(data, {
 			//showRowNumber : true,
@@ -478,11 +490,13 @@ body {
 					<div id="cycle_time_chart_div" class="panel-body"></div>
 				</div>
 
-				<div id="detail_wip_detail_table_panel" class="panel panel-default" style="display: none;">
+				<div id="cycle_time_detail_table_panel" class="panel panel-default"
+					style="display: none;">
 					<div class="container">
 						<div class="blog-header">
 							<h2>Cycle Time Detail</h2>
-							
+							<p id=cycle_time_detail_table_description
+								" class="lead blog-description"></p>
 						</div>
 					</div>
 					<div id="cycle_time_table_div" class="panel-body"></div>
