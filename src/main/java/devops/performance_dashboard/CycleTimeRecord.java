@@ -113,6 +113,8 @@ public class CycleTimeRecord implements Comparable<CycleTimeRecord> {
 			waitStdDev = waitStdDev + Math.pow((meanWait - diffDays), 2);
 		}
 		
+		waitStdDev = waitStdDev / commits.size();
+		
 		waitStdDev = Math.pow(waitStdDev, 0.5);
 		
 	}

@@ -63,6 +63,15 @@ public class JiraVersion implements Comparable<JiraVersion> {
 
 	@Override
 	public int compareTo(JiraVersion other) {
+		if (other == null)
+			return 1;
+		
+		if (releaseDate == null)
+			return -1;
+		
+		if (other.releaseDate == null)
+			return 1;
+		
 		return releaseDate.compareTo(other.releaseDate);
 	}
 	

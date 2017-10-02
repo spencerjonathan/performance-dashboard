@@ -378,7 +378,8 @@ public class GitAdaptor {
 
 	}
 
-	public Map<Commit, JiraVersion> getCommitsByVersion(List<JiraVersion> jiraVersions) throws GitAPIException, MissingObjectException, IncorrectObjectTypeException, IOException {
+	public Map<Commit, JiraVersion> getCommitsByVersion(List<JiraVersion> jiraVersions)
+			throws GitAPIException, MissingObjectException, IncorrectObjectTypeException, IOException {
 
 		Map<Commit, JiraVersion> returnValue = new HashMap<Commit, JiraVersion>();
 
@@ -386,16 +387,17 @@ public class GitAdaptor {
 		Collections.sort(jiraVersions);
 
 		List<Ref> releaseBranches = getReleaseBranches();
-		
+
 		for (JiraVersion jv : jiraVersions) {
-		
+
 			for (Ref branch : releaseBranches) {
-				if (branch.getName().matches(".*\\/" + jv.getName())) {
+				if (branch.getName().matches(".*\\/" + jv.getName())
+						|| branch.getName().matches(".*\\/" + jv.getName() + "\\.0")) {
 					System.out.println("Matched JiraVersion " + jv.getName() + " with Branch " + branch.getName());
 					addReleaseCommits(branch, jv, returnValue);
 				}
 			}
-			
+
 		}
 
 		return returnValue;
