@@ -23,7 +23,7 @@ body {
 <script type="text/javascript">
 	// Load the Visualization API and the corechart package.
 	google.charts.load('current', {
-		'packages' : [ 'corechart' ]
+		'packages' : [ 'corechart', 'table' ]
 	});
 
 	// Set a callback to run when the Google Visualization API is loaded.
@@ -347,9 +347,7 @@ body {
 
 		// The intervals data as narrow lines (useful for showing raw source data)
 		var options_lines = {
-			width : 1000,
-			height : 1000,
-			title : 'Cycle Time by Release',
+			title : 'Line intervals, default',
 			curveType : 'function',
 			lineWidth : 4,
 			series : [ {
@@ -363,7 +361,53 @@ body {
 
 		var chart_lines = new google.visualization.LineChart(document
 				.getElementById('cycle_time_chart_div'));
+
 		chart_lines.draw(data, options_lines);
+
+		function cycleTimeSelectHandler() {
+			var selectedItem = chart_lines.getSelection()[0];
+			if (selectedItem) {
+				var release = data.getValue(selectedItem.row, 0);
+				drawCycleTimeDetailTable(release);
+			}
+		}
+
+		google.visualization.events.addListener(chart_lines, 'select',
+				cycleTimeSelectHandler);
+	}
+
+	function drawCycleTimeDetailTable(release) {
+		var data = new google.visualization.DataTable();
+		data.addColumn('string', 'Author');
+		data.addColumn('number', 'Team');
+		data.addColumn('string', 'Commit Date');
+		data.addColumn('string', 'Commit');
+
+		cycleTimesData.forEach(function(record) {
+			if (record['releaseName'] == release) {
+				record['commits'].forEach(function(commit) {
+					var link = "<a href='" + commitLookupURI + commit['reference'] + "'>" + commit['reference'] + "</a>"; 
+					
+					var row = [ commit['author'], commit['team'],
+							commit['commitTime'], link ];
+					data.addRows([ row ]);
+				});
+			}
+
+		});
+
+		var table = new google.visualization.Table(document
+				.getElementById('cycle_time_table_div'));
+		
+		document.getElementById("detail_wip_detail_table_panel").style.display = "block";
+
+		table.draw(data, {
+			//showRowNumber : true,
+			allowHtml : true,
+			width : '100%'
+			//	height : '100%'
+		});
+
 	}
 </script>
 </head>
@@ -432,6 +476,16 @@ body {
 						</div>
 					</div>
 					<div id="cycle_time_chart_div" class="panel-body"></div>
+				</div>
+
+				<div id="detail_wip_detail_table_panel" class="panel panel-default" style="display: none;">
+					<div class="container">
+						<div class="blog-header">
+							<h2>Cycle Time Detail</h2>
+							
+						</div>
+					</div>
+					<div id="cycle_time_table_div" class="panel-body"></div>
 				</div>
 			</div>
 		</div>

@@ -17,6 +17,7 @@ public class Config {
 	private String targetFolder;
 	private String jiraUri;
 	private String jiraProject;
+	private String commitLookupUri;
 	
 	public Config(String username, String password, String uri, String localRepository) {
 		this.username = username;
@@ -134,6 +135,14 @@ public class Config {
 
 	public void setReleaseBranchPattern(String releaseBranchPattern) {
 		this.releaseBranchPattern = releaseBranchPattern;
+	}
+
+	public String getCommitLookupUri() {
+		return commitLookupUri;
+	}
+
+	public void setCommitLookupUri(String commitLookupUri) {
+		this.commitLookupUri = commitLookupUri;
 	}
 	
 }

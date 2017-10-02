@@ -27,6 +27,7 @@ import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.MissingObjectException;
 
 import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 
 /**
  * Hello world!
@@ -106,7 +107,7 @@ public class App {
 		
 		Collections.sort(cycleTimeRecords);
 
-		Gson gson = new Gson();
+		Gson gson = new GsonBuilder().setDateFormat("yyyy-MM-dd").create();
 		// Write git.js file
 		File output_file = new File(config.getTargetFolder() + "cycle_times.js");
 		FileWriter writer = null;
@@ -115,7 +116,9 @@ public class App {
 
 			writer.write("var cycleTimesData = ");
 			gson.toJson(cycleTimeRecords, writer);
-			writer.write(";");
+			writer.write(";\n");
+			
+			writer.write("var commitLookupURI = \"" + config.getCommitLookupUri() + "\";");
 
 			writer.close();
 
