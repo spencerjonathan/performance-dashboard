@@ -83,8 +83,8 @@ public class GitAdaptor {
 
 		if (config.getPerformPull()) {
 			System.out.print("Executing Git Pull to update local repository.. ");
-			// git.pull().call();
-			git.fetch().setCheckFetchedObjects(true).call();
+		    git.pull().call();
+			//git.fetch().setCheckFetchedObjects(true).call();
 			System.out.println("(Complete)");
 		} else {
 			System.out.println("Not performing Git Pull!");
