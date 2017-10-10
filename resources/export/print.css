@@ -1,0 +1,11 @@
+
+@media print {
+	.panel {
+		page-break-inside: avoid;
+		page-break-after: auto
+	}
+	
+	.btn-group {
+		display: none
+	}
+}
